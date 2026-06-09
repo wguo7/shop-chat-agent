@@ -39,7 +39,17 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
     const stream = await anthropic.messages.stream({
       model: AppConfig.api.defaultModel,
       max_tokens: AppConfig.api.maxTokens,
-      system: systemInstruction,
+      system: [
+        {
+          type: "text",
+          text: systemInstruction,
+          // Cache the stable system prompt. Prefix render order is tools -> system -> messages,
+          // so this caches tools + system while per-message context and the user turn vary.
+          // Dormant until the prefix exceeds Haiku 4.5's 4096-token cache minimum, which happens
+          // on its own once retrieval injects manual chunks. No padding is added to force it.
+          cache_control: { type: "ephemeral" }
+        }
+      ],
       messages,
       tools: tools && tools.length > 0 ? tools : undefined
     });

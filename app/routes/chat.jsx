@@ -8,6 +8,7 @@ import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server";
 import { createToolService } from "../services/tool.server";
+import { getManualContext } from "../services/retrieval.server";
 
 
 /**
@@ -176,8 +177,33 @@ async function handleChatSession({
       };
     });
 
-    // Execute the conversation stream
-    let finalMessage = { role: 'user', content: userMessage };
+    // Retrieve NextLED manual context for this question and prepend it to the
+    // current user turn, so there is a single user message carrying context +
+    // question. This sits in the messages (after the cached system block, never
+    // inside the cached system prefix), so prompt caching stays valid. Graceful:
+    // null on any failure, like the MCP tools. Ephemeral — the modified copy is
+    // never written to the DB, so the stored question and later turns stay clean.
+    const manualContext = await getManualContext(userMessage);
+    if (manualContext) {
+      const labeled =
+        `[NextLED manual context begins. Use this as your source of truth, and cite the SKU shown when you answer about a product.]\n\n` +
+        `${manualContext}\n\n` +
+        `[NextLED manual context ends.]`;
+      const lastIndex = conversationHistory.length - 1;
+      conversationHistory[lastIndex] = {
+        ...conversationHistory[lastIndex],
+        content: `${labeled}\n\n${userMessage}`,
+      };
+    }
+
+    // Execute the conversation stream.
+    // NOTE: `conversationHistory` (with the injected manual context above) is the
+    // actual payload sent to Claude on every iteration below. `finalMessage` is
+    // only a loop sentinel — its initial value is never sent; it is overwritten by
+    // the assistant's returned message (which carries stop_reason) on the first
+    // iteration. Seed it with just a stop_reason so it can't be mistaken for a
+    // user payload carrying the bare question.
+    let finalMessage = { stop_reason: null };
 
     while (finalMessage.stop_reason !== "end_turn") {
       finalMessage = await claudeService.streamConversation(
