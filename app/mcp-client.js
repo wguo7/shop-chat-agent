@@ -1,6 +1,22 @@
 import { generateAuthUrl } from "./auth.server";
 import { getCustomerToken } from "./db.server";
 
+// Module-level cache of formatted tool lists per MCP endpoint. Tool definitions are
+// store-wide and change rarely, so reuse them across requests (warm instances, via
+// Fluid Compute) to skip a tools/list round-trip on every message. TTL bounds staleness.
+const TOOLS_CACHE = new Map();
+const TOOLS_TTL_MS = 10 * 60 * 1000;
+
+function getCachedTools(endpoint) {
+  const hit = TOOLS_CACHE.get(endpoint);
+  if (hit && Date.now() - hit.ts < TOOLS_TTL_MS) return hit.tools;
+  return null;
+}
+
+function setCachedTools(endpoint, tools) {
+  if (Array.isArray(tools) && tools.length) TOOLS_CACHE.set(endpoint, { tools, ts: Date.now() });
+}
+
 /**
  * Client for interacting with Model Context Protocol (MCP) API endpoints.
  * Manages connections to both customer and storefront MCP endpoints, and handles tool invocation.
@@ -36,6 +52,13 @@ class MCPClient {
    */
   async connectToCustomerServer() {
     try {
+      const cached = getCachedTools(this.customerMcpEndpoint);
+      if (cached) {
+        this.customerTools = cached;
+        this.tools = [...this.tools, ...cached];
+        return cached;
+      }
+
       console.log(`Connecting to MCP server at ${this.customerMcpEndpoint}`);
 
       if (this.conversationId) {
@@ -66,6 +89,7 @@ class MCPClient {
       const toolsData = response.result && response.result.tools ? response.result.tools : [];
       const customerTools = this._formatToolsData(toolsData);
 
+      setCachedTools(this.customerMcpEndpoint, customerTools);
       this.customerTools = customerTools;
       this.tools = [...this.tools, ...customerTools];
 
@@ -84,6 +108,13 @@ class MCPClient {
    */
   async connectToStorefrontServer() {
     try {
+      const cached = getCachedTools(this.storefrontMcpEndpoint);
+      if (cached) {
+        this.storefrontTools = cached;
+        this.tools = [...this.tools, ...cached];
+        return cached;
+      }
+
       console.log(`Connecting to MCP server at ${this.storefrontMcpEndpoint}`);
 
       const headers = {
@@ -101,6 +132,7 @@ class MCPClient {
       const toolsData = response.result && response.result.tools ? response.result.tools : [];
       const storefrontTools = this._formatToolsData(toolsData);
 
+      setCachedTools(this.storefrontMcpEndpoint, storefrontTools);
       this.storefrontTools = storefrontTools;
       this.tools = [...this.tools, ...storefrontTools];
 
