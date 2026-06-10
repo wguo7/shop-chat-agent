@@ -34,7 +34,8 @@
 <script>
   window.shopChatConfig = {
     promptType: {{ block.settings.system_prompt | json }},
-    welcomeMessage: {{ block.settings.welcome_message | json }}
+    welcomeMessage: {{ block.settings.welcome_message | json }},
+    apiBaseUrl: "https://shop-chat-agent-henna.vercel.app"
   };
   window.shopId = {{ shop.id }};
 </script>
