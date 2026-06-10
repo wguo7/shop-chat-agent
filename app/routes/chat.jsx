@@ -156,6 +156,16 @@ async function handleChatSession({
         console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
       });
 
+    // For price/availability questions, kick off a live price lookup NOW, in parallel
+    // (a direct call to the storefront search that does not wait on the connect above).
+    // It hides under the DB + retrieval latency below, so price questions are no slower.
+    const pricePromise = /\b(price|prices|cost|costs|how much|pricing|msrp|\$)\b/i.test(userMessage)
+      ? fetchLivePrice(shopDomain, userMessage).catch((error) => {
+          console.warn("Price prefetch failed:", error.message);
+          return null;
+        })
+      : Promise.resolve(null);
+
     // Prepare conversation state
     let conversationHistory = [];
     let productsToDisplay = [];
@@ -213,25 +223,15 @@ async function handleChatSession({
     // with the DB + retrieval work above).
     await mcpConnectPromise;
 
-    // Price/availability questions: Haiku is unreliable at calling the search tool,
-    // so fetch the live price ourselves from the connected storefront search and
-    // inject it as data. Any failure just falls back to normal behavior.
-    if (/\b(price|prices|cost|costs|how much|pricing|msrp|\$)\b/i.test(userMessage)) {
-      const skuMatch = `${userMessage} ${recentText}`.match(/\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/i);
-      const query = skuMatch ? skuMatch[0] : userMessage;
-      try {
-        const res = await mcpClient.callTool("search_catalog", { catalog: { query } });
-        const priceLine = extractPrice(res, skuMatch ? skuMatch[0] : null);
-        if (priceLine) {
-          const last = conversationHistory.length - 1;
-          conversationHistory[last] = {
-            ...conversationHistory[last],
-            content: `[Live Shopify pricing]\n${priceLine}\n\n${conversationHistory[last].content}`,
-          };
-        }
-      } catch (error) {
-        console.warn("Price prefetch failed:", error.message);
-      }
+    // Inject the live price (looked up concurrently above, so it adds no real
+    // latency). Falls back silently if it found nothing.
+    const priceLine = await pricePromise;
+    if (priceLine) {
+      const last = conversationHistory.length - 1;
+      conversationHistory[last] = {
+        ...conversationHistory[last],
+        content: `[Live Shopify pricing]\n${priceLine}\n\n${conversationHistory[last].content}`,
+      };
     }
 
     // Execute the conversation stream.
@@ -418,6 +418,33 @@ function extractPrice(res, sku) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Fetch a live "Title: $price CUR" line for a price question by calling the
+ * storefront MCP search_catalog endpoint directly (no tools/list connect), so it can
+ * run concurrently with the rest of the request. Returns null if nothing is found.
+ * @param {string} shopDomain - storefront origin (e.g. https://store.myshopify.com)
+ * @param {string} message - the user message
+ * @returns {Promise<string|null>}
+ */
+async function fetchLivePrice(shopDomain, message) {
+  if (!shopDomain) return null;
+  const sku = message.match(/\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/i)?.[0] || null;
+  const body = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "search_catalog", arguments: { catalog: { query: sku || message } } },
+  });
+  const res = await fetch(`${shopDomain}/api/mcp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return extractPrice(data?.result, sku);
 }
 
 /**
