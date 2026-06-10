@@ -2,8 +2,12 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
+  provider      = "prisma-client-js"
+  // Native query engine. "native" covers local generate; "rhel-openssl-3.0.x" is
+  // the Vercel/AWS Lambda (Amazon Linux) runtime target so the engine is bundled
+  // into the serverless function. Vercel's file tracer reliably includes the
+  // native .so.node engine (unlike the wasm query compiler).
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 // Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
