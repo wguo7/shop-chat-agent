@@ -232,7 +232,7 @@
   
   /* Paragraph styling */
   .shop-ai-message.assistant p {
-    margin: 0 0 6px 0;
+    margin: 0 0 10px 0;
   }
   
   .shop-ai-message.assistant p:last-child {

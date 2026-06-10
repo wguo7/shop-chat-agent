@@ -47,9 +47,10 @@ function detectSkus(text, catalog) {
 
 /**
  * Build manual context for a query. Always includes a catalog overview of all
- * products (so the assistant is aware of the full lineup), plus detailed manual
- * excerpts: every chunk for any product referenced by SKU/name/keyword in the
- * current message (prioritized) or recent conversation, then semantic top-K.
+ * products. For details it takes the semantic top-K for the CURRENT question
+ * first (so an accessory/policy answer is never crowded out), then force-includes
+ * every chunk for a product referenced in the current message or recent
+ * conversation, up to a cap.
  * @param {string} query - the current user message
  * @param {string} [contextText] - recent conversation text, for reference detection
  * @returns {Promise<string|null>}
@@ -68,41 +69,34 @@ export async function getManualContext(query, contextText = "") {
     const minScore = AppConfig.retrieval?.minScore ?? 0.4;
     const maxChunks = AppConfig.retrieval?.maxChunks ?? 14;
 
-    // Referenced products: current message first, then recent context (most recent
-    // first), so the current question's product is never starved by the cap.
     const curRefs = detectSkus(query, catalog);
-    const ctxRefs = detectSkus(contextText, catalog).reverse();
-    const orderedSkus = [];
-    for (const s of [...curRefs, ...ctxRefs]) if (!orderedSkus.includes(s)) orderedSkus.push(s);
+    const ctxRefs = detectSkus(contextText, catalog).reverse().filter((s) => !curRefs.includes(s));
 
     const selected = [];
     const seen = new Set();
     const take = (c) => {
-      if (!seen.has(c.id)) { seen.add(c.id); selected.push(c); }
+      if (!seen.has(c.id) && selected.length < maxChunks) { seen.add(c.id); selected.push(c); }
     };
 
-    // 1) Force-include chunks for referenced products, priority order, up to cap.
-    let forcedCount = 0;
-    for (const sku of orderedSkus) {
-      if (selected.length >= maxChunks) break;
-      for (const c of chunks) {
-        if (selected.length >= maxChunks) break;
-        if (c.sku && c.sku.toUpperCase() === sku) { take(c); forcedCount++; }
-      }
-    }
-
-    // 2) Semantic top-K above the floor fills remaining detail slots.
+    // 1) Semantic top-K for the current query FIRST, so chunks most relevant to
+    //    what is being asked now (e.g. an accessory/policy answer) are never
+    //    crowded out by force-included product chunks.
     let ranked = [];
     try {
       const q = await embedQuery(query);
       ranked = chunks.map((c) => ({ c, score: dot(q, c.embedding) })).sort((a, b) => b.score - a.score);
-      for (const r of ranked.filter((r) => r.score >= minScore).slice(0, topK)) {
-        if (selected.length >= maxChunks) break;
-        take(r.c);
-      }
+      for (const r of ranked.filter((r) => r.score >= minScore).slice(0, topK)) take(r.c);
     } catch (e) {
       console.warn("Voyage embedder failed; using catalog + reference matches only:", e.message);
     }
+
+    // 2) Force-include the product named in the current message, then any from
+    //    recent context, until the cap is reached.
+    const forceSku = (sku) => {
+      for (const c of chunks) if (c.sku && c.sku.toUpperCase() === sku) take(c);
+    };
+    for (const sku of curRefs) forceSku(sku);
+    for (const sku of ctxRefs) forceSku(sku);
 
     // Always include the catalog overview, then the relevant manual details.
     const parts = [];
@@ -113,7 +107,7 @@ export async function getManualContext(query, contextText = "") {
     if (!parts.length) return null;
 
     const top = ranked.slice(0, 5).map((r) => `${r.c.sku ?? r.c.section}=${r.score.toFixed(3)}`).join("  ");
-    console.log(`[retrieval] q="${query.slice(0, 60)}" skus=[${orderedSkus.join(",")}] forced=${forcedCount} details=${selected.length} top: ${top}`);
+    console.log(`[retrieval] q="${query.slice(0, 60)}" cur=[${curRefs.join(",")}] ctx=[${ctxRefs.join(",")}] details=${selected.length} top: ${top}`);
 
     return parts.join("\n\n");
   } catch (e) {
