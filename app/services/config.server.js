@@ -23,6 +23,8 @@ export const AppConfig = {
     // retrieve. Off-catalog queries can score similarly, so grounding (the prompt's
     // answer-only-from-context rule), not this floor, is what declines them.
     minScore: 0.40,
+    // Hard cap on injected chunks (forced SKU chunks + semantic top-K combined).
+    maxChunks: 14,
   },
 
   // Error Message Templates

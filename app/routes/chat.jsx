@@ -183,7 +183,17 @@ async function handleChatSession({
     // inside the cached system prefix), so prompt caching stays valid. Graceful:
     // null on any failure, like the MCP tools. Ephemeral — the modified copy is
     // never written to the DB, so the stored question and later turns stay clean.
-    const manualContext = await getManualContext(userMessage);
+    // Recent conversation text (excluding the current message) so retrieval can
+    // detect a product/SKU named earlier in the chat for follow-up questions.
+    const toText = (content) =>
+      Array.isArray(content)
+        ? content.filter((b) => b && b.type === "text").map((b) => b.text).join(" ")
+        : typeof content === "string"
+          ? content
+          : "";
+    const recentText = conversationHistory.slice(-7, -1).map((m) => toText(m.content)).join(" ");
+
+    const manualContext = await getManualContext(userMessage, recentText);
     if (manualContext) {
       const labeled =
         `[NextLED manual context begins. Use this as your source of truth, and cite the SKU shown when you answer about a product.]\n\n` +

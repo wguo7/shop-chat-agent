@@ -16,12 +16,20 @@ function dot(a, b) {
   return s;
 }
 
+// Matches NextLED SKUs like NT-7647, NT-7647-1, NT-2061A-10UV, NT-LS002373.
+const SKU_RE = /\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/gi;
+
 /**
- * Retrieve the top manual chunks for a query that clear the similarity floor.
- * @param {string} query
- * @returns {Promise<string|null>} joined chunk texts, or null if nothing relevant / unavailable
+ * Retrieve manual chunks for a query. Combines semantic top-K with SKU-aware
+ * force-include: any SKU named in the current message OR recent conversation has
+ * all its chunks injected regardless of score. This makes "tell me about NT-7647"
+ * return the full product, and lets follow-ups like "what's the battery type"
+ * resolve to the product discussed earlier in the chat.
+ * @param {string} query - the current user message
+ * @param {string} [contextText] - recent conversation text, for SKU detection
+ * @returns {Promise<string|null>} joined chunk texts, or null if nothing relevant
  */
-export async function getManualContext(query) {
+export async function getManualContext(query, contextText = "") {
   try {
     const chunks = indexData?.chunks;
     if (!chunks?.length) {
@@ -29,32 +37,52 @@ export async function getManualContext(query) {
       return null;
     }
 
-    let q;
-    try {
-      q = await embedQuery(query);
-    } catch (e) {
-      console.warn("Voyage embedder failed, continuing without context:", e.message);
-      return null;
-    }
-
     const topK = AppConfig.retrieval?.topK ?? 6;
-    const minScore = AppConfig.retrieval?.minScore ?? 0.45;
+    const minScore = AppConfig.retrieval?.minScore ?? 0.4;
+    const maxChunks = AppConfig.retrieval?.maxChunks ?? 14;
 
-    const ranked = chunks
-      .map((c) => ({ sku: c.sku, section: c.section, text: c.text, score: dot(q, c.embedding) }))
-      .sort((a, b) => b.score - a.score);
+    // SKUs explicitly named in the current message or recent conversation.
+    const mentioned = new Set(
+      [...`${query} ${contextText}`.matchAll(SKU_RE)].map((m) => m[0].toUpperCase()),
+    );
 
-    // Diagnostics only — does not affect the returned set.
-    const label = (r) => `${r.sku ?? r.section}=${r.score.toFixed(3)}`;
-    console.log(`[retrieval] q="${query.slice(0, 70)}" top: ${ranked.slice(0, 6).map(label).join("  ")}`);
+    const selected = [];
+    const seen = new Set();
+    const take = (c) => {
+      if (!seen.has(c.id)) { seen.add(c.id); selected.push(c); }
+    };
 
-    const cleared = ranked.filter((r) => r.score >= minScore).slice(0, topK);
-    if (!cleared.length) {
-      console.log(`[retrieval] nothing cleared minScore=${minScore} -> injecting null`);
+    // 1) Force-include every chunk for an explicitly named SKU (ignores score).
+    let forcedCount = 0;
+    if (mentioned.size) {
+      for (const c of chunks) {
+        if (c.sku && mentioned.has(c.sku.toUpperCase())) { take(c); forcedCount++; }
+      }
+    }
+
+    // 2) Add semantic top-K above the floor.
+    let ranked = [];
+    try {
+      const q = await embedQuery(query);
+      ranked = chunks
+        .map((c) => ({ c, score: dot(q, c.embedding) }))
+        .sort((a, b) => b.score - a.score);
+      for (const r of ranked.filter((r) => r.score >= minScore).slice(0, topK)) take(r.c);
+    } catch (e) {
+      console.warn("Voyage embedder failed; using SKU matches only:", e.message);
+    }
+
+    if (!selected.length) {
+      console.log(`[retrieval] nothing relevant (mentioned=${[...mentioned].join(",") || "none"}) -> null`);
       return null;
     }
-    console.log(`[retrieval] injecting ${cleared.length} chunk(s) >= ${minScore}: ${cleared.map(label).join("  ")}`);
-    return cleared.map((r) => r.text).join("\n\n---\n\n");
+
+    const finalChunks = selected.slice(0, maxChunks);
+    const top = ranked.slice(0, 6).map((r) => `${r.c.sku ?? r.c.section}=${r.score.toFixed(3)}`).join("  ");
+    console.log(`[retrieval] q="${query.slice(0, 60)}" mentioned=[${[...mentioned].join(",")}] forced=${forcedCount} top: ${top}`);
+    console.log(`[retrieval] injecting ${finalChunks.length} chunk(s)`);
+
+    return finalChunks.map((c) => c.text).join("\n\n---\n\n");
   } catch (e) {
     console.warn("Manual retrieval failed, continuing without context:", e.message);
     return null;
