@@ -18,7 +18,11 @@ export const AppConfig = {
     // Minimum cosine score (0..1) a chunk must reach to be injected. Chunks below
     // this are dropped; if none clear it, no manual context is injected and the
     // model gives its honest not-sure-plus-human answer. Tune for precision/recall.
-    minScore: 0.45,
+    // Tuned for Voyage voyage-3.5-lite, whose cosine scores run lower/compressed
+    // vs MiniLM. On-topic questions top out ~0.42-0.70; this floor lets them
+    // retrieve. Off-catalog queries can score similarly, so grounding (the prompt's
+    // answer-only-from-context rule), not this floor, is what declines them.
+    minScore: 0.40,
   },
 
   // Error Message Templates
