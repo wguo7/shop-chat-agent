@@ -10,6 +10,9 @@ import { embedDocuments, EMBED_MODEL } from "../app/services/voyage.server.js";
 const KNOWLEDGE_DIR = path.resolve("knowledge");
 const OUT_FILE = path.resolve("data", "manual-index.json");
 const EXCLUDE = new Set(["_TEMPLATE.md", "STYLE.md"]);
+// Max chars per chunk for prose/manual sections (~350 tokens). Long sections like
+// a verbatim manual are split into this size so retrieval stays granular.
+const MAX_CHUNK_CHARS = 1400;
 
 function listMarkdown() {
   return fs
@@ -104,6 +107,40 @@ function splitBySubsections(content) {
   return result;
 }
 
+// Split a long block into chunks of at most ~maxChars, breaking on blank lines
+// (paragraphs) so a big section like a verbatim manual becomes several retrievable
+// chunks instead of one oversized, blurry one.
+function splitLong(text, maxChars) {
+  const t = (text || "").trim();
+  if (t.length <= maxChars) return t ? [t] : [];
+  const paras = t.split(/\n\s*\n/);
+  const out = [];
+  let cur = "";
+  const flush = () => {
+    if (cur.trim()) out.push(cur.trim());
+    cur = "";
+  };
+  for (const p of paras) {
+    if (p.length > maxChars) {
+      flush();
+      const lines = p.split("\n");
+      let buf = "";
+      for (const ln of lines) {
+        if (buf && buf.length + ln.length + 1 > maxChars) { out.push(buf.trim()); buf = ""; }
+        buf += ln + "\n";
+      }
+      if (buf.trim()) out.push(buf.trim());
+    } else if (cur && cur.length + p.length + 2 > maxChars) {
+      flush();
+      cur = p;
+    } else {
+      cur += (cur ? "\n\n" : "") + p;
+    }
+  }
+  flush();
+  return out;
+}
+
 // Turn one file into labelled, self-contained chunks.
 function chunkFile(file, raw) {
   const { data, content } = matter(raw);
@@ -138,14 +175,18 @@ function chunkFile(file, raw) {
         push(label, "Comparison", r.text, r.sku, r.name);
       }
     } else {
-      // Specifications, Troubleshooting, What it is, How this differs, etc.
-      // Kept whole — unless the section has "### " subsections (e.g. the 3-in-1
-      // kit's per-head spec tables), in which case split one chunk per subsection.
-      const subs = splitBySubsections(secContent);
-      if (subs.length > 1) {
-        for (const s of subs) push(baseLabel, `${name} — ${s.sub}`, s.text);
-      } else {
-        push(baseLabel, name, secContent);
+      // Specifications, Troubleshooting, What it is, Full manual text, etc.
+      // Strip markdown code fences (verbatim manuals are wrapped in ```), split
+      // into "### " subsections if any, then split any long block into part-sized
+      // chunks so big sections become multiple retrievable chunks, not one blob.
+      const cleaned = secContent.replace(/^```.*$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+      const subs = splitBySubsections(cleaned);
+      for (const s of subs) {
+        const label = s.sub ? `${name} — ${s.sub}` : name;
+        const parts = splitLong(s.text, MAX_CHUNK_CHARS);
+        parts.forEach((part, i) => {
+          push(baseLabel, parts.length > 1 ? `${label} (part ${i + 1})` : label, part);
+        });
       }
     }
   }
