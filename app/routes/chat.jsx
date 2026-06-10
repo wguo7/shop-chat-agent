@@ -23,6 +23,8 @@ export async function loader({ request }) {
     });
   }
 
+  if (!isOriginAllowed(request)) return forbidden(request);
+
   const url = new URL(request.url);
 
   // Handle history fetch requests - matches /chat?history=true&conversation_id=XYZ
@@ -43,6 +45,7 @@ export async function loader({ request }) {
  * React Router action function for handling POST requests
  */
 export async function action({ request }) {
+  if (!isOriginAllowed(request)) return forbidden(request);
   return handleChatRequest(request);
 }
 
@@ -359,6 +362,34 @@ async function getCustomerAccountUrls(shopDomain, conversationId) {
     console.error("Error getting customer MCP API URL:", error);
     return null;
   }
+}
+
+/**
+ * Whether the request's Origin is allowed. If ALLOWED_ORIGINS is unset, all
+ * origins are allowed (so the endpoint isn't broken before it's configured).
+ * @param {Request} request
+ * @returns {boolean}
+ */
+function isOriginAllowed(request) {
+  const allowed = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (allowed.length === 0) return true;
+  const origin = request.headers.get("Origin");
+  return !!origin && allowed.includes(origin);
+}
+
+/**
+ * 403 response for a disallowed Origin.
+ * @param {Request} request
+ * @returns {Response}
+ */
+function forbidden(request) {
+  return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+    status: 403,
+    headers: getCorsHeaders(request),
+  });
 }
 
 /**
