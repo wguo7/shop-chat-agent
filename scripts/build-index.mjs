@@ -249,7 +249,9 @@ async function main() {
     const batch = allChunks.slice(i, i + BATCH);
     const vectors = await embedDocuments(batch.map((c) => c.text));
     for (let j = 0; j < batch.length; j++) {
-      batch[j].embedding = vectors[j];
+      // Round to 6 decimals: cosine ranking is unaffected, but it roughly halves the
+      // JSON size of the embeddings, shrinking the bundle and cold-start parse time.
+      batch[j].embedding = vectors[j].map((v) => Math.round(v * 1e6) / 1e6);
       dim = vectors[j].length;
     }
     console.log(`  embedded ${Math.min(i + BATCH, allChunks.length)}/${allChunks.length}`);
