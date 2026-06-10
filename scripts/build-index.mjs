@@ -159,8 +159,23 @@ async function main() {
 
   const allChunks = [];
   const perFile = new Map();
+  const catalog = [];      // per-product { sku, product_name, aliases, keywords } for reference detection
+  let catalogSummary = ""; // compact catalog (the product-index comparison table) always injected
   for (const file of files) {
     const raw = fs.readFileSync(path.join(KNOWLEDGE_DIR, file), "utf8");
+    const { data } = matter(raw);
+    if (data.sku) {
+      catalog.push({
+        sku: data.sku,
+        product_name: data.product_name || "",
+        aliases: Array.isArray(data.aliases) ? data.aliases : [],
+        keywords: Array.isArray(data.keywords) ? data.keywords : [],
+      });
+    }
+    if (file === "product-index.md") {
+      // The comparison-table rows are the authoritative compact catalog overview.
+      catalogSummary = raw.split("\n").filter((l) => l.trim().startsWith("|")).join("\n");
+    }
     const chunks = chunkFile(file, raw);
     perFile.set(file, chunks.length);
     allChunks.push(...chunks);
@@ -214,7 +229,7 @@ async function main() {
   fs.writeFileSync(
     OUT_FILE,
     JSON.stringify(
-      { model: EMBED_MODEL, dim, createdAt: new Date().toISOString(), count: allChunks.length, chunks: allChunks },
+      { model: EMBED_MODEL, dim, createdAt: new Date().toISOString(), count: allChunks.length, catalog, catalogSummary, chunks: allChunks },
       null,
       2,
     ),
