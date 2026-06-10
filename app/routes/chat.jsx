@@ -143,21 +143,19 @@ async function handleChatSession({
     // Send conversation ID to client
     stream.sendMessage({ type: 'id', conversation_id: conversationId });
 
-    // Connect to MCP servers and get available tools
-    let storefrontMcpTools = [], customerMcpTools = [];
-
-    try {
-      // Connect to both MCP servers in parallel to save a network round-trip.
-      [storefrontMcpTools, customerMcpTools] = await Promise.all([
-        mcpClient.connectToStorefrontServer(),
-        mcpClient.connectToCustomerServer(),
-      ]);
-
-      console.log(`Connected to MCP with ${storefrontMcpTools.length} tools`);
-      console.log(`Connected to customer MCP with ${customerMcpTools.length} tools`);
-    } catch (error) {
-      console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
-    }
+    // Connect to both MCP servers, but DON'T await yet — let this run concurrently
+    // with the DB + retrieval work below, then await it just before the Claude call.
+    const mcpConnectPromise = Promise.all([
+      mcpClient.connectToStorefrontServer(),
+      mcpClient.connectToCustomerServer(),
+    ])
+      .then(([storefrontMcpTools, customerMcpTools]) => {
+        console.log(`Connected to MCP with ${storefrontMcpTools.length} tools`);
+        console.log(`Connected to customer MCP with ${customerMcpTools.length} tools`);
+      })
+      .catch((error) => {
+        console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
+      });
 
     // Prepare conversation state
     let conversationHistory = [];
@@ -211,6 +209,10 @@ async function handleChatSession({
         content: `${labeled}\n\n${userMessage}`,
       };
     }
+
+    // Ensure MCP tools are connected before the Claude call (it ran concurrently
+    // with the DB + retrieval work above).
+    await mcpConnectPromise;
 
     // Execute the conversation stream.
     // NOTE: `conversationHistory` (with the injected manual context above) is the
