@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NextLED chat widget — local preview</title>
+  <!-- The real widget stylesheet (served from the extension folder) -->
+  <link rel="stylesheet" href="/extensions/chat-bubble/assets/chat.css" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; color: #222; background: #f6f6f6; }
+    .note { max-width: 640px; line-height: 1.5; }
+    code { background: #eee; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="note">
+    <h1>NextLED chat widget — local preview</h1>
+    <p>This page renders the real theme-extension widget (its actual HTML, <code>chat.css</code>,
+       and <code>chat.js</code>) and points it at the live Vercel backend, so you can see the
+       design <em>and</em> get real answers. Click the chat bubble at the bottom-right.</p>
+    <p>It uses the pre-seeded conversation <code>ui-preview</code>. To start a fresh chat, run
+       <code>sessionStorage.clear()</code> in the browser console and reload (it will reuse
+       <code>ui-preview</code>).</p>
+  </div>
+
+  <!-- Exact widget markup from blocks/chat-interface.liquid (Liquid values filled in statically) -->
+  <div class="shop-ai-chat-container">
+    <div class="shop-ai-chat-bubble" style="background-color: #5046e4">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+
+    <div class="shop-ai-chat-window">
+      <div class="shop-ai-chat-header">
+        <div>NextLED Assistant</div>
+        <button class="shop-ai-chat-close">✕</button>
+      </div>
+
+      <div class="shop-ai-chat-messages"></div>
+
+      <div class="shop-ai-chat-input">
+        <input type="text" placeholder="Type your message here..." />
+        <button class="shop-ai-chat-send">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Use the seeded conversation so the backend doesn't hit the .well-known guard.
+    sessionStorage.setItem('shopAiConversationId', 'ui-preview');
+    window.shopId = '0';
+    window.shopChatConfig = {
+      promptType: 'standardAssistant',
+      welcomeMessage: '👋 Hi! Ask me anything about NextLED products or store policies.',
+      // Point the widget at the live Vercel backend for this local preview.
+      apiBaseUrl: 'https://shop-chat-agent-henna.vercel.app'
+    };
+  </script>
+  <script src="/extensions/chat-bubble/assets/chat.js"></script>
+</body>
+</html>
