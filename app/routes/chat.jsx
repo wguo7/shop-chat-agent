@@ -147,8 +147,11 @@ async function handleChatSession({
     let storefrontMcpTools = [], customerMcpTools = [];
 
     try {
-      storefrontMcpTools = await mcpClient.connectToStorefrontServer();
-      customerMcpTools = await mcpClient.connectToCustomerServer();
+      // Connect to both MCP servers in parallel to save a network round-trip.
+      [storefrontMcpTools, customerMcpTools] = await Promise.all([
+        mcpClient.connectToStorefrontServer(),
+        mcpClient.connectToCustomerServer(),
+      ]);
 
       console.log(`Connected to MCP with ${storefrontMcpTools.length} tools`);
       console.log(`Connected to customer MCP with ${customerMcpTools.length} tools`);
