@@ -209,14 +209,25 @@
     }
   }
   
-  /* List styling for assistant messages */
+  /* List styling for assistant messages. Force markers visible even if the
+     storefront theme resets list-style globally. */
   .shop-ai-message.assistant ul,
   .shop-ai-message.assistant ol {
     margin: 8px 0;
     padding-left: 24px;
+    list-style-position: outside !important;
+  }
+
+  .shop-ai-message.assistant ul {
+    list-style-type: disc !important;
+  }
+
+  .shop-ai-message.assistant ol {
+    list-style-type: decimal !important;
   }
   
   .shop-ai-message.assistant li {
+    display: list-item !important;
     margin-bottom: 6px;
   }
   
