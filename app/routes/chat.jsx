@@ -150,8 +150,7 @@ async function handleChatSession({
       mcpClient.connectToCustomerServer(),
     ])
       .then(([storefrontMcpTools, customerMcpTools]) => {
-        console.log(`Connected to MCP with ${storefrontMcpTools.length} tools`);
-        console.log(`Connected to customer MCP with ${customerMcpTools.length} tools`);
+        console.log(`Connected to MCP (${storefrontMcpTools.length} storefront + ${customerMcpTools.length} customer tools)`);
       })
       .catch((error) => {
         console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);

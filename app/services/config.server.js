@@ -24,7 +24,8 @@ export const AppConfig = {
     // answer-only-from-context rule), not this floor, is what declines them.
     minScore: 0.40,
     // Hard cap on injected chunks (forced SKU chunks + semantic top-K combined).
-    maxChunks: 14,
+    // Kept modest to limit per-request input tokens (faster, more consistent first token).
+    maxChunks: 10,
   },
 
   // Error Message Templates

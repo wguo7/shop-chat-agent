@@ -168,18 +168,21 @@ async function main() {
       catalog.push({
         sku: data.sku,
         product_name: data.product_name || "",
+        category: data.category || "",
         aliases: Array.isArray(data.aliases) ? data.aliases : [],
         keywords: Array.isArray(data.keywords) ? data.keywords : [],
       });
-    }
-    if (file === "product-index.md") {
-      // The comparison-table rows are the authoritative compact catalog overview.
-      catalogSummary = raw.split("\n").filter((l) => l.trim().startsWith("|")).join("\n");
     }
     const chunks = chunkFile(file, raw);
     perFile.set(file, chunks.length);
     allChunks.push(...chunks);
   }
+
+  // Compact catalog overview (one line per product) — injected on every request so
+  // the assistant always knows the full lineup, while keeping per-request tokens low.
+  catalogSummary = catalog
+    .map((p) => `- ${p.sku} ${p.product_name}${p.category ? ` (${p.category})` : ""}`)
+    .join("\n");
 
   // Per-file chunk counts + zero-chunk guard.
   console.log("Per-file chunk counts:");

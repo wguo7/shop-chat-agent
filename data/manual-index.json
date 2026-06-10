@@ -1,12 +1,13 @@
 {
   "model": "voyage-3.5-lite",
   "dim": 1024,
-  "createdAt": "2026-06-10T03:17:38.746Z",
+  "createdAt": "2026-06-10T15:24:43.676Z",
   "count": 447,
   "catalog": [
     {
       "sku": "NT-1010UV",
       "product_name": "Professional Rechargeable Color Matching UV Flood Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-1010UV",
@@ -21,6 +22,7 @@
     {
       "sku": "NT-2040B-3",
       "product_name": "Professional 3 Temperature Color Matching Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [
         "NT-20408-3"
       ],
@@ -38,6 +40,7 @@
     {
       "sku": "NT-2061A-10UV",
       "product_name": "Rechargeable Handheld Bar LED and UV Work Light",
+      "category": "Mechanic Work Lights",
       "aliases": [
         "EF-2061A-10UV",
         "370-5525"
@@ -57,6 +60,7 @@
     {
       "sku": "NT-2143C-B",
       "product_name": "Professional Rechargeable Motion-Sensing Detailing Headlamp",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-2143C-B",
@@ -72,6 +76,7 @@
     {
       "sku": "NT-2220LF-UV",
       "product_name": "Rechargeable Detachable Under Hood LED and UV Work Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [
         "NT-2200LF-UV",
         "NT-EF2220LF-UV"
@@ -91,6 +96,7 @@
     {
       "sku": "NT-5571",
       "product_name": "Cordless Rechargeable Drop Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-5571",
@@ -106,6 +112,7 @@
     {
       "sku": "NT-6598",
       "product_name": "Multi-Function Spot and Wide Beam Headlamp",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6598",
@@ -121,6 +128,7 @@
     {
       "sku": "NT-6615",
       "product_name": "Spot Flood and UV Pen Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6615",
@@ -136,6 +144,7 @@
     {
       "sku": "NT-6615K",
       "product_name": "Spot Flood and UV Detailing Pen Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-6615K",
@@ -151,6 +160,7 @@
     {
       "sku": "NT-6633",
       "product_name": "Rechargeable Dimmable Neck Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-6633",
@@ -165,6 +175,7 @@
     {
       "sku": "NT-6648",
       "product_name": "10\" Triple Light Mode Under Car LED Work Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6648",
@@ -180,6 +191,7 @@
     {
       "sku": "NT-6685",
       "product_name": "Rechargeable Obstacle Sensor Magnetic Pocket Work Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6685",
@@ -194,6 +206,7 @@
     {
       "sku": "NT-6692M",
       "product_name": "Professional Rechargeable Color Matching Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-6692M",
@@ -210,6 +223,7 @@
     {
       "sku": "NT-6763",
       "product_name": "Rechargeable Zoomable Neck Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [
         "ZF6763"
       ],
@@ -227,6 +241,7 @@
     {
       "sku": "NT-6786",
       "product_name": "Pocket LED Task Light with Spot Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6786",
@@ -242,6 +257,7 @@
     {
       "sku": "NT-6788",
       "product_name": "Multi-Function Rechargeable Keychain Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6788",
@@ -256,6 +272,7 @@
     {
       "sku": "NT-6926",
       "product_name": "Dual Power Tripod LED Work Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-6926",
@@ -271,6 +288,7 @@
     {
       "sku": "NT-6926M",
       "product_name": "Remote Control Dual Power Tripod LED Work Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [
         "NT-6926-M"
       ],
@@ -289,6 +307,7 @@
     {
       "sku": "NT-7543",
       "product_name": "Folding Bar LED Task Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-7543",
@@ -303,6 +322,7 @@
     {
       "sku": "NT-7544",
       "product_name": "Double Sided LED Task Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-7544",
@@ -318,6 +338,7 @@
     {
       "sku": "NT-7647-1",
       "product_name": "Flexible Shaft LED Task Light with Magnetic Pick-Up Tool",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-7647-1",
@@ -333,6 +354,7 @@
     {
       "sku": "NT-7647-F",
       "product_name": "Flexible Shaft LED Grill Light",
+      "category": "Uncatalogued",
       "aliases": [
         "NT7647-F"
       ],
@@ -349,6 +371,7 @@
     {
       "sku": "NT-7647",
       "product_name": "Flexible Shaft LED Work Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-7647",
@@ -364,6 +387,7 @@
     {
       "sku": "NT-7728",
       "product_name": "LED Grill Light",
+      "category": "Uncatalogued",
       "aliases": [],
       "keywords": [
         "NT-7728",
@@ -377,6 +401,7 @@
     {
       "sku": "NT-7885M",
       "product_name": "Professional Rechargeable Color Match Inspection Work Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-7885M",
@@ -393,6 +418,7 @@
     {
       "sku": "NT-LS002373",
       "product_name": "Rechargeable 3-in-1 Quick Connect Light Kit",
+      "category": "Uncatalogued",
       "aliases": [],
       "keywords": [
         "NT-LS002373",
@@ -407,6 +433,7 @@
     {
       "sku": "NT-R3202",
       "product_name": "Rechargeable Mountable Paint and Powder Gun Color Matching Light",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-R3202",
@@ -421,6 +448,7 @@
     {
       "sku": "NT-V3505",
       "product_name": "Professional Hand-Held Coating Application Light with Diffuser",
+      "category": "Auto Paint and Detail Lights",
       "aliases": [],
       "keywords": [
         "NT-V3505",
@@ -435,6 +463,7 @@
     {
       "sku": "NT-W2301",
       "product_name": "Folding Rechargeable Slim Bar LED Work Light",
+      "category": "Mechanic Work Lights",
       "aliases": [],
       "keywords": [
         "NT-W2301",
@@ -448,7 +477,7 @@
       ]
     }
   ],
-  "catalogSummary": "| SKU | Product name | Category | Line | CRI | Max lumens | Key differentiator | Best use case |\n|---|---|---|---|---|---|---|---|\n| NT-W2301 | Folding Rechargeable Slim Bar LED Work Light | Mechanic Work Lights | standard |  | 600 lm | Slim swivel bar with flood plus end spot | Tight engine bays and narrow spaces |\n| NT-5571 | Cordless Rechargeable Drop Light | Mechanic Work Lights | standard |  | 1000 lm | Cordless drop light with a power bank | Cordless replacement for a corded drop light |\n| NT-6685 | Rechargeable Obstacle Sensor Magnetic Pocket Work Light | Mechanic Work Lights | standard |  | 1200 lm | Obstacle sensor turns the light off near a surface | Pocket close up hands free work |\n| NT-7544 | Double Sided LED Task Light | Mechanic Work Lights | standard |  | 1200 lm | Two light bars, corded or cordless | Lighting a bench or under hood from both sides |\n| NT-7543 | Folding Bar LED Task Light | Mechanic Work Lights | standard |  | 350 lm | Single folding bar, corded or cordless | Single bar task lighting |\n| NT-7647 | Flexible Shaft LED Work Light | Mechanic Work Lights | standard |  | 200 lm | Flexible shaft with zoom head on AA power | Hands free light in tight spots |\n| NT-7647-1 | Flexible Shaft LED Task Light with Magnetic Pick-Up Tool | Mechanic Work Lights | standard |  | 300 lm | Magnetic pick up head lifts 1 lb and extends 24 in | Lighting while retrieving dropped metal parts |\n| NT-6615 | Spot Flood and UV Pen Light | Mechanic Work Lights | standard |  | 300 lm | 3 in 1 pen with no CRI rating | Pocket spot, flood, and UV for mechanics |\n| NT-6926 | Dual Power Tripod LED Work Light | Mechanic Work Lights | standard |  | 5000 lm | Telescoping tripod with a removable magnetic head | Lighting a whole work area from a tripod |\n| NT-6786 | Pocket LED Task Light with Spot Light | Mechanic Work Lights | standard |  | 500 lm | Pocket task light and spot with a power bank | Pocket close up work with phone charging |\n| NT-2061A-10UV | Rechargeable Handheld Bar LED and UV Work Light | Mechanic Work Lights | standard |  | 1000 lm | Handheld bar with a UV leak mode and two hooks | General shop tasks plus leak checking |\n| NT-6598 | Multi-Function Spot and Wide Beam Headlamp | Mechanic Work Lights | standard |  | 300 lm | 3 light headlamp with red and a rear tail light | Hands free head lighting for repair and outdoors |\n| NT-6788 | Multi-Function Rechargeable Keychain Light | Mechanic Work Lights | standard |  | 400 lm | Keychain light with CREE and COB sources | Everyday carry keychain light |\n| NT-6648 | 10\" Triple Light Mode Under Car LED Work Light | Mechanic Work Lights | standard |  | 500 lm | Rolling under car disc plus flexible arm and UV | Under car and floor level work |\n| NT-7885M | Professional Rechargeable Color Match Inspection Work Light | Auto Paint and Detail Lights | ULTIMATE | 95+ | 1500 lm | Brightest color match light, dual temps plus SMD spot, UV, and pick up tip | Professional paint inspection and color matching |\n| NT-6692M | Professional Rechargeable Color Matching Light | Auto Paint and Detail Lights | ULTIMATE | 96+ | 500 lm | Five color temperatures with memory and a diffuser | Fine paint color matching |\n| NT-6926M | Remote Control Dual Power Tripod LED Work Light | Auto Paint and Detail Lights | ULTIMATE | 90+ | 6000 lm | Remote control, four batteries, extended run time | Large area lighting with remote control |\n| NT-R3202 | Rechargeable Mountable Paint and Powder Gun Color Matching Light | Auto Paint and Detail Lights | standard | 95 | 450 lm | Mounts on a paint or powder gun, three temps | Color matching while spraying |\n| NT-V3505 | Professional Hand-Held Coating Application Light with Diffuser | Auto Paint and Detail Lights | standard | 95+ | 1000 lm | Warm 4000 K light with a diffuser for an even wash | Coating and paint correction, spotting high spots |\n| NT-2143C-B | Professional Rechargeable Motion-Sensing Detailing Headlamp | Auto Paint and Detail Lights | standard | 95+ | 300 lm | Wave sensor headlamp with three color temps | Hands free color match headlamp |\n| NT-6615K | Spot Flood and UV Detailing Pen Light | Auto Paint and Detail Lights | standard | 95+ | 430 lm | CRI 95 plus pen at 6000 K with UV | Detailing and color match in a pocket pen |\n| NT-1010UV | Professional Rechargeable Color Matching UV Flood Light | Auto Paint and Detail Lights | standard | 95+ | 2000 lm | Large area color match flood with UV and a power bank | Color matching over large areas |\n| NT-2040B-3 | Professional 3 Temperature Color Matching Light | Auto Paint and Detail Lights | standard | 96+ | 500 lm | Three color temps with a mountable charging base | Handheld color matching |\n| NT-2220LF-UV | Rechargeable Detachable Under Hood LED and UV Work Light | Auto Paint and Detail Lights | standard |  | 2000 lm | Telescoping under hood bar with UV, lights detach | Lighting an engine bay from above |\n| NT-6763 | Rechargeable Zoomable Neck Light | Auto Paint and Detail Lights | standard |  | 500 lm | Zoomable focus with a replaceable battery | Hands free wearable light with adjustable focus |\n| NT-6633 | Rechargeable Dimmable Neck Light | Auto Paint and Detail Lights | standard |  | 300 lm | Wrap around with a separate switch per light and full dimming | Hands free wearable dual light |\n| NT-7647-F | Flexible Shaft LED Grill Light | Uncatalogued | standard |  | 200 lm | Warm 3200 K grill light on a flexible shaft | Lighting a grill |\n| NT-7728 | LED Grill Light | Uncatalogued | standard |  | 210 lm | CREE grill light with infinite brightness adjustability | Lighting a grill |\n| NT-LS002373 | Rechargeable 3-in-1 Quick Connect Light Kit | Uncatalogued | standard |  | 400 lm | Three interchangeable heads on one base | One kit that covers several jobs |",
+  "catalogSummary": "- NT-1010UV Professional Rechargeable Color Matching UV Flood Light (Auto Paint and Detail Lights)\n- NT-2040B-3 Professional 3 Temperature Color Matching Light (Auto Paint and Detail Lights)\n- NT-2061A-10UV Rechargeable Handheld Bar LED and UV Work Light (Mechanic Work Lights)\n- NT-2143C-B Professional Rechargeable Motion-Sensing Detailing Headlamp (Auto Paint and Detail Lights)\n- NT-2220LF-UV Rechargeable Detachable Under Hood LED and UV Work Light (Auto Paint and Detail Lights)\n- NT-5571 Cordless Rechargeable Drop Light (Mechanic Work Lights)\n- NT-6598 Multi-Function Spot and Wide Beam Headlamp (Mechanic Work Lights)\n- NT-6615 Spot Flood and UV Pen Light (Mechanic Work Lights)\n- NT-6615K Spot Flood and UV Detailing Pen Light (Auto Paint and Detail Lights)\n- NT-6633 Rechargeable Dimmable Neck Light (Auto Paint and Detail Lights)\n- NT-6648 10\" Triple Light Mode Under Car LED Work Light (Mechanic Work Lights)\n- NT-6685 Rechargeable Obstacle Sensor Magnetic Pocket Work Light (Mechanic Work Lights)\n- NT-6692M Professional Rechargeable Color Matching Light (Auto Paint and Detail Lights)\n- NT-6763 Rechargeable Zoomable Neck Light (Auto Paint and Detail Lights)\n- NT-6786 Pocket LED Task Light with Spot Light (Mechanic Work Lights)\n- NT-6788 Multi-Function Rechargeable Keychain Light (Mechanic Work Lights)\n- NT-6926 Dual Power Tripod LED Work Light (Mechanic Work Lights)\n- NT-6926M Remote Control Dual Power Tripod LED Work Light (Auto Paint and Detail Lights)\n- NT-7543 Folding Bar LED Task Light (Mechanic Work Lights)\n- NT-7544 Double Sided LED Task Light (Mechanic Work Lights)\n- NT-7647-1 Flexible Shaft LED Task Light with Magnetic Pick-Up Tool (Mechanic Work Lights)\n- NT-7647-F Flexible Shaft LED Grill Light (Uncatalogued)\n- NT-7647 Flexible Shaft LED Work Light (Mechanic Work Lights)\n- NT-7728 LED Grill Light (Uncatalogued)\n- NT-7885M Professional Rechargeable Color Match Inspection Work Light (Auto Paint and Detail Lights)\n- NT-LS002373 Rechargeable 3-in-1 Quick Connect Light Kit (Uncatalogued)\n- NT-R3202 Rechargeable Mountable Paint and Powder Gun Color Matching Light (Auto Paint and Detail Lights)\n- NT-V3505 Professional Hand-Held Coating Application Light with Diffuser (Auto Paint and Detail Lights)\n- NT-W2301 Folding Rechargeable Slim Bar LED Work Light (Mechanic Work Lights)",
   "chunks": [
     {
       "id": "NT-1010UV.md#0",
