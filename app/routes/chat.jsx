@@ -213,6 +213,27 @@ async function handleChatSession({
     // with the DB + retrieval work above).
     await mcpConnectPromise;
 
+    // Price/availability questions: Haiku is unreliable at calling the search tool,
+    // so fetch the live price ourselves from the connected storefront search and
+    // inject it as data. Any failure just falls back to normal behavior.
+    if (/\b(price|prices|cost|costs|how much|pricing|msrp|\$)\b/i.test(userMessage)) {
+      const skuMatch = `${userMessage} ${recentText}`.match(/\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/i);
+      const query = skuMatch ? skuMatch[0] : userMessage;
+      try {
+        const res = await mcpClient.callTool("search_catalog", { catalog: { query } });
+        const priceLine = extractPrice(res, skuMatch ? skuMatch[0] : null);
+        if (priceLine) {
+          const last = conversationHistory.length - 1;
+          conversationHistory[last] = {
+            ...conversationHistory[last],
+            content: `[Live Shopify pricing]\n${priceLine}\n\n${conversationHistory[last].content}`,
+          };
+        }
+      } catch (error) {
+        console.warn("Price prefetch failed:", error.message);
+      }
+    }
+
     // Execute the conversation stream.
     // NOTE: `conversationHistory` (with the injected manual context above) is the
     // actual payload sent to Claude on every iteration below. `finalMessage` is
@@ -370,6 +391,31 @@ async function getCustomerAccountUrls(shopDomain, conversationId) {
     return urls;
   } catch (error) {
     console.error("Error getting customer MCP API URL:", error);
+    return null;
+  }
+}
+
+/**
+ * Extract a "Title: $price CUR" line from a search_catalog result, preferring the
+ * product whose title contains the given SKU. Amounts are in minor units.
+ * @param {Object} res - search_catalog tool result
+ * @param {string|null} sku
+ * @returns {string|null}
+ */
+function extractPrice(res, sku) {
+  try {
+    const text = res?.content?.find((c) => c?.type === "text")?.text;
+    if (!text) return null;
+    const products = JSON.parse(text)?.products || [];
+    if (!products.length) return null;
+    const match = sku
+      ? products.find((p) => (p.title || "").toUpperCase().includes(sku.toUpperCase()))
+      : null;
+    const p = match || products[0];
+    const min = p?.price_range?.min;
+    if (!min || min.amount == null) return null;
+    return `${p.title}: $${(Number(min.amount) / 100).toFixed(2)} ${min.currency || "USD"}`;
+  } catch {
     return null;
   }
 }
