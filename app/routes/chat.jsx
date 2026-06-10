@@ -257,7 +257,13 @@ async function handleChatSession({
           // Handle tool use requests
           onToolUse: async (content) => {
             const toolName = content.name;
-            const toolArgs = content.input;
+            let toolArgs = content.input;
+            // search_catalog expects the query nested under `catalog`; some models
+            // emit it flat (e.g. { query }), which the tool silently ignores and
+            // returns a default list. Wrap flat args so the search actually runs.
+            if (toolName === "search_catalog" && toolArgs && typeof toolArgs === "object" && !toolArgs.catalog) {
+              toolArgs = { catalog: toolArgs };
+            }
             const toolUseId = content.id;
 
             const toolUseMessage = `Calling tool: ${toolName} with arguments: ${JSON.stringify(toolArgs)}`;
