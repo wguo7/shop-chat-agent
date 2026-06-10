@@ -41,10 +41,15 @@ export async function getManualContext(query, contextText = "") {
     const minScore = AppConfig.retrieval?.minScore ?? 0.4;
     const maxChunks = AppConfig.retrieval?.maxChunks ?? 14;
 
-    // SKUs explicitly named in the current message or recent conversation.
-    const mentioned = new Set(
-      [...`${query} ${contextText}`.matchAll(SKU_RE)].map((m) => m[0].toUpperCase()),
-    );
+    // SKU priority: those named in the CURRENT message first, then recent
+    // conversation (most-recent first). Current-message SKUs must not be starved
+    // by the maxChunks cap when older SKUs are also present in the history.
+    const fromCurrent = [...query.matchAll(SKU_RE)].map((m) => m[0].toUpperCase());
+    const fromContext = [...contextText.matchAll(SKU_RE)].map((m) => m[0].toUpperCase()).reverse();
+    const orderedSkus = [];
+    for (const s of [...fromCurrent, ...fromContext]) {
+      if (!orderedSkus.includes(s)) orderedSkus.push(s);
+    }
 
     const selected = [];
     const seen = new Set();
@@ -52,11 +57,13 @@ export async function getManualContext(query, contextText = "") {
       if (!seen.has(c.id)) { seen.add(c.id); selected.push(c); }
     };
 
-    // 1) Force-include every chunk for an explicitly named SKU (ignores score).
+    // 1) Force-include chunks for named SKUs, in priority order, up to the cap.
     let forcedCount = 0;
-    if (mentioned.size) {
+    for (const sku of orderedSkus) {
+      if (selected.length >= maxChunks) break;
       for (const c of chunks) {
-        if (c.sku && mentioned.has(c.sku.toUpperCase())) { take(c); forcedCount++; }
+        if (selected.length >= maxChunks) break;
+        if (c.sku && c.sku.toUpperCase() === sku) { take(c); forcedCount++; }
       }
     }
 
@@ -73,13 +80,13 @@ export async function getManualContext(query, contextText = "") {
     }
 
     if (!selected.length) {
-      console.log(`[retrieval] nothing relevant (mentioned=${[...mentioned].join(",") || "none"}) -> null`);
+      console.log(`[retrieval] nothing relevant (skus=${orderedSkus.join(",") || "none"}) -> null`);
       return null;
     }
 
     const finalChunks = selected.slice(0, maxChunks);
     const top = ranked.slice(0, 6).map((r) => `${r.c.sku ?? r.c.section}=${r.score.toFixed(3)}`).join("  ");
-    console.log(`[retrieval] q="${query.slice(0, 60)}" mentioned=[${[...mentioned].join(",")}] forced=${forcedCount} top: ${top}`);
+    console.log(`[retrieval] q="${query.slice(0, 60)}" skus=[${orderedSkus.join(",")}] forced=${forcedCount} top: ${top}`);
     console.log(`[retrieval] injecting ${finalChunks.length} chunk(s)`);
 
     return finalChunks.map((c) => c.text).join("\n\n---\n\n");
