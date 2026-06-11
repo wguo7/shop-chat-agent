@@ -302,7 +302,7 @@ async function handleChatSession({
       const last = conversationHistory.length - 1;
       conversationHistory[last] = {
         ...conversationHistory[last],
-        content: `[Live Shopify pricing]\n${priceLine}\n\n${conversationHistory[last].content}`,
+        content: `[Live Shopify pricing — best catalog match for this conversation. Only state this price if it is the product the customer is asking about; otherwise use search_catalog.]\n${priceLine}\n\n${conversationHistory[last].content}`,
       };
     }
 
@@ -509,6 +509,38 @@ function persistUrlsForConversation(conversationId, urls) {
   });
 }
 
+// Accessory listings (chargers, replacement parts) carry the main product's SKU
+// in their titles, so a naive title match returns the $30 charger for a question
+// about the $250 light. Demote them at every preference level.
+const ACCESSORY_TITLE_RE = /\b(charger|adapter|cable|replacement|lamp head|battery|mount|bracket)\b/i;
+
+/**
+ * Pick the most likely intended product from search results: exact SKU token
+ * beats substring (so NT-6926 doesn't silently mean NT-6926M), and main
+ * products beat accessories at each level.
+ * @param {Array} products
+ * @param {string|null} sku
+ * @returns {Object}
+ */
+function pickPricedProduct(products, sku) {
+  const isAccessory = (p) => ACCESSORY_TITLE_RE.test(p.title || "");
+  if (!sku) return products.find((p) => !isAccessory(p)) || products[0];
+  const upper = sku.toUpperCase();
+  const exact = new RegExp(`\\b${upper.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+  const rungs = [
+    (p) => exact.test(p.title || "") && !isAccessory(p),
+    (p) => (p.title || "").toUpperCase().includes(upper) && !isAccessory(p),
+    (p) => exact.test(p.title || ""),
+    (p) => (p.title || "").toUpperCase().includes(upper),
+    (p) => !isAccessory(p),
+  ];
+  for (const matches of rungs) {
+    const hit = products.find(matches);
+    if (hit) return hit;
+  }
+  return products[0];
+}
+
 /**
  * Extract a "Title: $price CUR" line from a search_catalog result, preferring the
  * product whose title contains the given SKU. Amounts are in minor units.
@@ -522,10 +554,7 @@ function extractPrice(res, sku) {
     if (!text) return null;
     const products = JSON.parse(text)?.products || [];
     if (!products.length) return null;
-    const match = sku
-      ? products.find((p) => (p.title || "").toUpperCase().includes(sku.toUpperCase()))
-      : null;
-    const p = match || products[0];
+    const p = pickPricedProduct(products, sku);
     const min = p?.price_range?.min;
     if (min == null) return null;
     // Shape varies by store/API version: { amount, currency } in minor units,

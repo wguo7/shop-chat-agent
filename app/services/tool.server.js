@@ -39,9 +39,15 @@ export function createToolService() {
    * @param {Function} persistMessage - Ordered persistence callback (role, content)
    */
   const handleToolSuccess = async (toolUseResponse, toolName, toolUseId, conversationHistory, productsToDisplay, persistMessage) => {
-    // Check if this is a product search result
+    // Check if this is a product search result. Multiple searches in one turn
+    // return overlapping results, so dedupe before display.
     if (AppConfig.tools.productSearchNames.includes(toolName)) {
-      productsToDisplay.push(...processProductSearchResult(toolUseResponse));
+      for (const product of processProductSearchResult(toolUseResponse)) {
+        const isDuplicate = productsToDisplay.some(
+          (existing) => existing.id === product.id || existing.title === product.title
+        );
+        if (!isDuplicate) productsToDisplay.push(product);
+      }
     }
 
     await addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.content, persistMessage);
@@ -88,16 +94,37 @@ export function createToolService() {
   };
 
   /**
+   * Formats a display price. price_range.min varies by store/API version:
+   * an { amount, currency } object in minor units, or a plain decimal.
+   * @param {Object} product - Raw product data
+   * @returns {string} Display price
+   */
+  const formatProductPrice = (product) => {
+    const min = product.price_range?.min;
+    if (min != null && typeof min === "object") {
+      if (min.amount != null) {
+        return `$${(Number(min.amount) / 100).toFixed(2)} ${min.currency || "USD"}`;
+      }
+    } else if (min != null) {
+      const amount = Number(min);
+      if (Number.isFinite(amount)) {
+        return `$${amount.toFixed(2)} ${product.price_range.currency || "USD"}`;
+      }
+    }
+    const variant = product.variants?.[0];
+    if (variant && variant.price != null) {
+      return `${variant.currency || "USD"} ${variant.price}`;
+    }
+    return 'Price not available';
+  };
+
+  /**
    * Formats a product data object
    * @param {Object} product - Raw product data
    * @returns {Object} Formatted product data
    */
   const formatProductData = (product) => {
-    const price = product.price_range
-      ? `${product.price_range.currency} ${product.price_range.min}`
-      : (product.variants && product.variants.length > 0
-        ? `${product.variants[0].currency} ${product.variants[0].price}`
-        : 'Price not available');
+    const price = formatProductPrice(product);
 
     return {
       id: product.product_id || `product-${Math.random().toString(36).substring(7)}`,
