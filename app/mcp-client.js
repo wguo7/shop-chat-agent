@@ -5,7 +5,9 @@ import { getCustomerToken } from "./db.server";
 // store-wide and change rarely, so reuse them across requests (warm instances, via
 // Fluid Compute) to skip a tools/list round-trip on every message. TTL bounds staleness.
 const TOOLS_CACHE = new Map();
-const TOOLS_TTL_MS = 10 * 60 * 1000;
+// Tool definitions essentially never change; a long TTL means warm instances
+// almost never pay the tools/list round-trip.
+const TOOLS_TTL_MS = 60 * 60 * 1000;
 
 function getCachedTools(endpoint) {
   const hit = TOOLS_CACHE.get(endpoint);

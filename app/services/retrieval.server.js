@@ -53,9 +53,11 @@ function detectSkus(text, catalog) {
  * conversation, up to a cap.
  * @param {string} query - the current user message
  * @param {string} [contextText] - recent conversation text, for reference detection
+ * @param {Promise<number[]>} [embeddingPromise] - pre-started query embedding, so
+ *   the Voyage round trip can overlap the caller's DB work instead of following it
  * @returns {Promise<string|null>}
  */
-export async function getManualContext(query, contextText = "") {
+export async function getManualContext(query, contextText = "", embeddingPromise = null) {
   try {
     const chunks = indexData?.chunks;
     if (!chunks?.length) {
@@ -83,7 +85,7 @@ export async function getManualContext(query, contextText = "") {
     //    crowded out by force-included product chunks.
     let ranked = [];
     try {
-      const q = await embedQuery(query);
+      const q = await (embeddingPromise || embedQuery(query));
       ranked = chunks.map((c) => ({ c, score: dot(q, c.embedding) })).sort((a, b) => b.score - a.score);
       for (const r of ranked.filter((r) => r.score >= minScore).slice(0, topK)) take(r.c);
     } catch (e) {

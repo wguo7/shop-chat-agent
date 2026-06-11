@@ -9,6 +9,16 @@ import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server";
 import { createToolService } from "../services/tool.server";
 import { getManualContext } from "../services/retrieval.server";
+import { embedQuery } from "../services/voyage.server";
+
+// Customer-account URLs (.well-known endpoints) are shop-wide, not per
+// conversation. Cache them per shop hostname on warm instances so new
+// conversations don't pay two .well-known fetches; the per-conversation DB row
+// (which the OAuth callback reads) is written fire-and-forget, tracked here so
+// it's written once per conversation, not on every message.
+const SHOP_URLS_CACHE = new Map();
+const SHOP_URLS_TTL_MS = 60 * 60 * 1000;
+const URLS_STORED_FOR = new Set();
 
 
 /**
@@ -131,15 +141,16 @@ async function handleChatSession({
   // Initialize MCP client
   const shopId = request.headers.get("X-Shopify-Shop-Id");
   const shopDomain = request.headers.get("Origin");
-  // Returns null on any failure (missing Origin, .well-known fetch error) — don't
-  // crash the whole session over it, the MCP client has endpoint fallbacks.
-  const { mcpApiUrl } = (await getCustomerAccountUrls(shopDomain, conversationId)) || {};
+  // Resolves to null on any failure (missing Origin, .well-known fetch error).
+  // NOT awaited here: the result is only needed by the customer MCP connect, so
+  // it runs concurrently with everything below instead of blocking the session.
+  const urlsPromise = getCustomerAccountUrls(shopDomain, conversationId);
 
   const mcpClient = new MCPClient(
     shopDomain,
     conversationId,
     shopId,
-    mcpApiUrl,
+    null,
   );
 
   // Persist messages through a serial chain so DB insert order always matches
@@ -160,16 +171,18 @@ async function handleChatSession({
 
     // Connect to both MCP servers, but DON'T await yet — let this run concurrently
     // with the DB + retrieval work below, then await it just before the Claude call.
-    const mcpConnectPromise = Promise.all([
-      mcpClient.connectToStorefrontServer(),
-      mcpClient.connectToCustomerServer(),
-    ])
-      .then(([storefrontMcpTools, customerMcpTools]) => {
-        console.log(`Connected to MCP (${storefrontMcpTools.length} storefront + ${customerMcpTools.length} customer tools)`);
-      })
-      .catch((error) => {
-        console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
-      });
+    // The customer endpoint override waits on the (also concurrent) URL lookup.
+    const mcpConnectPromise = (async () => {
+      const { mcpApiUrl } = (await urlsPromise) || {};
+      if (mcpApiUrl) mcpClient.customerMcpEndpoint = mcpApiUrl;
+      const [storefrontMcpTools, customerMcpTools] = await Promise.all([
+        mcpClient.connectToStorefrontServer(),
+        mcpClient.connectToCustomerServer(),
+      ]);
+      console.log(`Connected to MCP (${storefrontMcpTools.length} storefront + ${customerMcpTools.length} customer tools)`);
+    })().catch((error) => {
+      console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
+    });
 
     // For price/availability questions, kick off a live price lookup NOW, in parallel
     // (a direct call to the storefront search that does not wait on the connect above).
@@ -184,10 +197,18 @@ async function handleChatSession({
     // Prepare conversation state
     const productsToDisplay = [];
 
-    // Fetch prior messages, then queue the current user message for persistence.
+    // Start the query embedding now: it only needs the user's message, so the
+    // Voyage round trip (~150-300ms) hides under the history fetch instead of
+    // running after it. Retrieval awaits (and error-handles) it; the extra
+    // handler here just prevents an unhandled rejection if retrieval bails first.
+    const embeddingPromise = embedQuery(userMessage);
+    embeddingPromise.catch(() => {});
+
+    // Fetch prior messages (capped — old turns add tokens and latency every
+    // turn forever), then queue the current user message for persistence.
     // The save chain keeps insert order correct, and appending in memory avoids
     // a serialized save + full re-read of the conversation on the hot path.
-    const dbMessages = await getConversationHistory(conversationId);
+    const dbMessages = await getConversationHistory(conversationId, AppConfig.api.historyLimit);
     persistMessage('user', userMessage);
 
     // Format messages for Claude API
@@ -203,6 +224,19 @@ async function handleChatSession({
         content
       };
     });
+
+    // The capped window can open mid tool exchange; a leading tool_result whose
+    // tool_use fell outside the window (or a leading assistant message) is
+    // invalid for the Claude API, so trim until the window starts on a plain
+    // user message.
+    while (conversationHistory.length) {
+      const first = conversationHistory[0];
+      const hasToolResult = Array.isArray(first.content) &&
+        first.content.some((block) => block?.type === "tool_result");
+      if (first.role === "user" && !hasToolResult) break;
+      conversationHistory.shift();
+    }
+
     conversationHistory.push({ role: 'user', content: userMessage });
 
     // Retrieve NextLED manual context for this question and prepend it to the
@@ -221,7 +255,7 @@ async function handleChatSession({
           : "";
     const recentText = conversationHistory.slice(-7, -1).map((m) => toText(m.content)).join(" ");
 
-    const manualContext = await getManualContext(userMessage, recentText);
+    const manualContext = await getManualContext(userMessage, recentText, embeddingPromise);
     if (manualContext) {
       const labeled =
         `[NextLED manual context begins. Use this as your source of truth, and cite the SKU shown when you answer about a product.]\n\n` +
@@ -390,40 +424,66 @@ async function handleChatSession({
  */
 async function getCustomerAccountUrls(shopDomain, conversationId) {
   try {
-    // Check if the customer account URL exists in the DB
-    const existingUrls = await getCustomerAccountUrlsFromDb(conversationId);
-
-    // If URL exists, return early with the MCP API URL
-    if (existingUrls) return existingUrls;
-
-    // If not, query for it from the Shopify API
     const { hostname } = new URL(shopDomain);
 
-    const urls = await Promise.all([
+    // Warm-instance shop cache: skips both the DB read and the .well-known
+    // fetches. The OAuth callback later reads these by conversationId from the
+    // DB, so keep that row populated (fire-and-forget, once per conversation).
+    const hit = SHOP_URLS_CACHE.get(hostname);
+    if (hit && Date.now() - hit.ts < SHOP_URLS_TTL_MS) {
+      persistUrlsForConversation(conversationId, hit.urls);
+      return hit.urls;
+    }
+
+    // Check if the customer account URLs exist in the DB for this conversation
+    const existingUrls = await getCustomerAccountUrlsFromDb(conversationId);
+    if (existingUrls) {
+      const urls = {
+        mcpApiUrl: existingUrls.mcpApiUrl,
+        authorizationUrl: existingUrls.authorizationUrl,
+        tokenUrl: existingUrls.tokenUrl,
+      };
+      SHOP_URLS_CACHE.set(hostname, { urls, ts: Date.now() });
+      URLS_STORED_FOR.add(conversationId);
+      return urls;
+    }
+
+    // If not, query the shop's .well-known endpoints
+    const [mcpResponse, openidResponse] = await Promise.all([
       fetch(`https://${hostname}/.well-known/customer-account-api`).then(res => res.json()),
       fetch(`https://${hostname}/.well-known/openid-configuration`).then(res => res.json()),
-    ]).then(async ([mcpResponse, openidResponse]) => {
-      const response = {
-        mcpApiUrl: mcpResponse.mcp_api,
-        authorizationUrl: openidResponse.authorization_endpoint,
-        tokenUrl: openidResponse.token_endpoint,
-      };
+    ]);
 
-      await storeCustomerAccountUrls({
-        conversationId,
-        mcpApiUrl: mcpResponse.mcp_api,
-        authorizationUrl: openidResponse.authorization_endpoint,
-        tokenUrl: openidResponse.token_endpoint,
-      });
+    const urls = {
+      mcpApiUrl: mcpResponse.mcp_api,
+      authorizationUrl: openidResponse.authorization_endpoint,
+      tokenUrl: openidResponse.token_endpoint,
+    };
 
-      return response;
-    });
+    SHOP_URLS_CACHE.set(hostname, { urls, ts: Date.now() });
+    persistUrlsForConversation(conversationId, urls);
 
     return urls;
   } catch (error) {
     console.error("Error getting customer MCP API URL:", error);
     return null;
   }
+}
+
+/**
+ * Write the customer account URLs to the conversation's DB row (the OAuth
+ * callback looks them up by conversationId). Fire-and-forget, once per
+ * conversation per instance.
+ * @param {string} conversationId
+ * @param {Object} urls
+ */
+function persistUrlsForConversation(conversationId, urls) {
+  if (URLS_STORED_FOR.has(conversationId)) return;
+  URLS_STORED_FOR.add(conversationId);
+  storeCustomerAccountUrls({ conversationId, ...urls }).catch((error) => {
+    URLS_STORED_FOR.delete(conversationId);
+    console.error("Error storing customer account URLs:", error);
+  });
 }
 
 /**

@@ -170,20 +170,24 @@ export async function saveMessage(conversationId, role, content) {
 }
 
 /**
- * Get conversation history
+ * Get conversation history (most recent `limit` messages, in chronological order)
  * @param {string} conversationId - The conversation ID
+ * @param {number} [limit] - Max messages to return; 0/undefined returns all
  * @returns {Promise<Array>} - Array of messages in the conversation
  */
-export async function getConversationHistory(conversationId) {
+export async function getConversationHistory(conversationId, limit = 0) {
   try {
+    // Fetch newest-first so `take` keeps the most recent window, then restore
+    // chronological order. id (cuid) as tiebreaker: same-millisecond inserts
+    // (assistant tool_use + its tool_result) must keep their insert order or
+    // the history is invalid.
     const messages = await prisma.message.findMany({
       where: { conversationId },
-      // id (cuid) as tiebreaker: same-millisecond inserts (assistant tool_use +
-      // its tool_result) must keep their insert order or the history is invalid.
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      ...(limit > 0 ? { take: limit } : {})
     });
 
-    return messages;
+    return messages.reverse();
   } catch (error) {
     console.error('Error retrieving conversation history:', error);
     return [];

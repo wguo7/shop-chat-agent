@@ -9,6 +9,10 @@ export const AppConfig = {
     defaultModel: 'claude-haiku-4-5',
     maxTokens: 768,
     defaultPromptType: 'standardAssistant',
+    // Max prior messages sent to Claude per turn. Caps DB read size, input
+    // tokens, and time-to-first-token so long conversations don't slow down
+    // forever. Note: tool_use/tool_result exchanges count as messages too.
+    historyLimit: 20,
   },
 
   // Retrieval (NextLED manual context) configuration
