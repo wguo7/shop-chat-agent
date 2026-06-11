@@ -1,0 +1,58 @@
+# Auto-rebuild + deploy when the knowledge base or prompt changes.
+#
+# This makes "add a product manual" a no-code task: edit or add a file under
+# knowledge/ on github.com (web editor is fine), commit to this branch, and CI
+# re-embeds the index and ships it to production. No local setup needed.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   VOYAGE_API_KEY  - same key as in Vercel env (embeds the manual chunks)
+#   VERCEL_TOKEN    - create at vercel.com/account/tokens
+name: rebuild-index
+
+on:
+  push:
+    branches: [deploy/vercel-postgres-voyage]
+    paths:
+      - "knowledge/**"
+      - "app/prompts/**"
+      - "scripts/build-index.mjs"
+  workflow_dispatch:
+
+concurrency:
+  group: rebuild-index
+  cancel-in-progress: false
+
+jobs:
+  rebuild-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERCEL_ORG_ID: team_RyfAcoo8iP0kD6ggjQaYQTYU
+      VERCEL_PROJECT_ID: prj_F15fMCSVhFynYPHmgwPRgaLPNEDz
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild manual index (Voyage embeddings)
+        env:
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: node scripts/build-index.mjs
+
+      - name: Commit regenerated index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/manual-index.json
+          git diff --cached --quiet || git commit -m "chore(index): rebuild from knowledge change [auto]"
+          git push
+
+      - name: Deploy to Vercel production
+        run: npx vercel deploy --prod --yes --token "${{ secrets.VERCEL_TOKEN }}"

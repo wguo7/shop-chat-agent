@@ -1,6 +1,8 @@
-# Build an AI Agent for Your Storefront
+﻿# Build an AI Agent for Your Storefront
 
-A Shopify template app that lets you embed an AI-powered chat widget on your storefront. Shoppers can search for products, ask about policies or shipping, and complete purchases - all without leaving the conversation. Under the hood it speaks the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) to tap into Shopify’s APIs.
+> **Maintainers:** see [MAINTAINING.md](./MAINTAINING.md) for how to add product manuals, deploy, and run this NextLED deployment day to day.
+
+A Shopify template app that lets you embed an AI-powered chat widget on your storefront. Shoppers can search for products, ask about policies or shipping, and complete purchases - all without leaving the conversation. Under the hood it speaks the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) to tap into Shopifyâ€™s APIs.
 
 ## Overview
 
@@ -42,7 +44,7 @@ When you start the app, it will:
 For direct testing, point your test suite at the `/chat` endpoint (GET or POST for streaming).
 
 ### MCP Tools Integration
-- The backend already initializes all Shopify MCP tools—see [`app/mcp-client.js`](./app/mcp-client.js).
+- The backend already initializes all Shopify MCP toolsâ€”see [`app/mcp-client.js`](./app/mcp-client.js).
 - These tools let your LLM invoke product search, cart actions, order lookups, etc.
 - More in our [dev docs](https://shopify.dev/docs/apps/build/storefront-mcp).
 
