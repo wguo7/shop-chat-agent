@@ -306,18 +306,25 @@ class MCPClient {
   /**
    * Formats raw tool data into a consistent format.
    *
+   * Cart and checkout tools are filtered out entirely (owner decision): the chat
+   * answers questions and points customers to the product page to buy — it never
+   * builds carts or checkouts. Removing the tools (vs. prompting around them)
+   * makes in-chat purchasing impossible rather than discouraged.
+   *
    * @private
    * @param {Array} toolsData - Raw tools data from the API
    * @returns {Array} Formatted tools data
    */
   _formatToolsData(toolsData) {
-    return toolsData.map((tool) => {
-      return {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.inputSchema || tool.input_schema,
-      };
-    });
+    return toolsData
+      .filter((tool) => !/cart|checkout/i.test(tool.name))
+      .map((tool) => {
+        return {
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.inputSchema || tool.input_schema,
+        };
+      });
   }
 }
 

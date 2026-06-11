@@ -894,27 +894,21 @@
         price.textContent = product.price;
         info.appendChild(price);
 
-        // Add add-to-cart button
-        const button = document.createElement('button');
-        button.classList.add('shop-ai-add-to-cart');
-        button.textContent = 'Add to Cart';
-        button.dataset.productId = product.id;
+        // Purchasing happens on the product page, not in chat: link out instead
+        // of adding to cart.
+        if (product.url) {
+          const viewLink = document.createElement('a');
+          viewLink.classList.add('shop-ai-add-to-cart');
+          viewLink.textContent = 'View product';
+          viewLink.href = product.url;
+          viewLink.target = '_blank';
+          viewLink.rel = 'noopener noreferrer';
+          viewLink.style.textDecoration = 'none';
+          viewLink.style.display = 'inline-block';
+          viewLink.style.textAlign = 'center';
+          info.appendChild(viewLink);
+        }
 
-        // Add click handler for the button
-        button.addEventListener('click', function() {
-          // Send message to add this product to cart
-          const input = document.querySelector('.shop-ai-chat-input input');
-          if (input) {
-            input.value = `Add ${product.title} to my cart`;
-            // Trigger a click on the send button
-            const sendButton = document.querySelector('.shop-ai-chat-send');
-            if (sendButton) {
-              sendButton.click();
-            }
-          }
-        });
-
-        info.appendChild(button);
         card.appendChild(info);
 
         return card;
