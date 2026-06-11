@@ -41,7 +41,10 @@ export const AppConfig = {
 
   // Tool Configuration
   tools: {
-    productSearchName: "search_shop_catalog",
+    // Tool names whose results render product cards. Shopify's storefront MCP has
+    // served both names depending on store/API version; this store exposes
+    // search_catalog (see the arg-wrapping in chat.jsx), so match either.
+    productSearchNames: ["search_catalog", "search_shop_catalog"],
     maxProductsToDisplay: 3
   }
 };

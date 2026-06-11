@@ -52,7 +52,7 @@ export function createStreamManager(encoder, controller) {
   const handleStreamingError = (error) => {
     console.error('Error processing streaming request:', error);
 
-    if (error.status === 401 || error.message.includes('auth') || error.message.includes('key')) {
+    if (error.status === 401 || error.status === 403 || /api key|authentication/i.test(error.message || '')) {
       sendError({
         type: 'error',
         error: 'Authentication failed with Claude API',

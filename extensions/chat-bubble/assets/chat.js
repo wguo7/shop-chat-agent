@@ -357,30 +357,49 @@
      */
     Formatting: {
       /**
+       * Escape HTML special characters so model/tool text can never inject markup
+       * @param {string} text - Raw text
+       * @returns {string} HTML-escaped text
+       */
+      escapeHtml: function(text) {
+        return text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      },
+
+      /**
        * Format message content with markdown and links
        * @param {HTMLElement} element - The element to format
        */
       formatMessageContent: function(element) {
         if (!element || !element.dataset.rawText) return;
 
-        const rawText = element.dataset.rawText;
+        // Escape FIRST: the model's output can carry attacker-influenced text
+        // (prompt injection, tool results), so the only tags allowed into
+        // innerHTML are the ones this formatter builds itself.
+        let processedText = this.escapeHtml(element.dataset.rawText);
 
-        // Process the text with various Markdown features
-        let processedText = rawText;
-
-        // Process Markdown links
+        // Process Markdown links. `url` is HTML-escaped here, so it cannot break
+        // out of the href attribute; decode &amp; only to validate the protocol.
         const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
         processedText = processedText.replace(markdownLinkRegex, (match, text, url) => {
+          const decoded = url.replace(/&amp;/g, '&');
+          // Only https URLs become links (blocks javascript:, data:, etc.)
+          if (!/^https:\/\//i.test(decoded)) return text;
+
           // Check if it's an auth URL
-          if (url.includes('shopify.com/authentication') &&
-             (url.includes('oauth/authorize') || url.includes('authentication'))) {
+          if (decoded.includes('shopify.com/authentication') &&
+             (decoded.includes('oauth/authorize') || decoded.includes('authentication'))) {
             // Store the auth URL in a global variable for later use - this avoids issues with onclick handlers
-            window.shopAuthUrl = url;
+            window.shopAuthUrl = decoded;
             // Just return normal link that will be handled by the document click handler
             return '<a href="#auth" class="shop-auth-trigger">' + text + '</a>';
           }
           // If it's a checkout link, replace the text
-          else if (url.includes('/cart') || url.includes('checkout')) {
+          else if (decoded.includes('/cart') || decoded.includes('checkout')) {
             return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">click here to proceed to checkout</a>';
           } else {
             // For normal links, preserve the original text

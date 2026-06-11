@@ -23,6 +23,9 @@ export async function storeCodeVerifier(state, verifier) {
   const expiresAt = new Date();
   expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
+  // Opportunistic cleanup so expired verifiers don't accumulate forever.
+  prisma.codeVerifier.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
+
   try {
     return await prisma.codeVerifier.create({
       data: {
@@ -78,6 +81,9 @@ export async function getCodeVerifier(state) {
  * @returns {Promise<Object>} - The saved customer token
  */
 export async function storeCustomerToken(conversationId, accessToken, expiresAt) {
+  // Opportunistic cleanup of expired tokens (getCustomerToken never returns them).
+  prisma.customerToken.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
+
   try {
     // Check if a token already exists for this conversation
     const existingToken = await prisma.customerToken.findFirst({
@@ -137,54 +143,24 @@ export async function getCustomerToken(conversationId) {
 }
 
 /**
- * Create or update a conversation in the database
- * @param {string} conversationId - The conversation ID
- * @returns {Promise<Object>} - The created or updated conversation
- */
-export async function createOrUpdateConversation(conversationId) {
-  try {
-    const existingConversation = await prisma.conversation.findUnique({
-      where: { id: conversationId }
-    });
-
-    if (existingConversation) {
-      return await prisma.conversation.update({
-        where: { id: conversationId },
-        data: {
-          updatedAt: new Date()
-        }
-      });
-    }
-
-    return await prisma.conversation.create({
-      data: {
-        id: conversationId
-      }
-    });
-  } catch (error) {
-    console.error('Error creating/updating conversation:', error);
-    throw error;
-  }
-}
-
-/**
- * Save a message to the database
+ * Save a message to the database. A single upsert touches/creates the
+ * conversation and inserts the message (was 3 round trips before).
  * @param {string} conversationId - The conversation ID
  * @param {string} role - The message role (user or assistant)
  * @param {string} content - The message content
- * @returns {Promise<Object>} - The saved message
+ * @returns {Promise<Object>} - The conversation the message was saved to
  */
 export async function saveMessage(conversationId, role, content) {
   try {
-    // Ensure the conversation exists
-    await createOrUpdateConversation(conversationId);
-
-    // Create the message
-    return await prisma.message.create({
-      data: {
-        conversationId,
-        role,
-        content
+    return await prisma.conversation.upsert({
+      where: { id: conversationId },
+      create: {
+        id: conversationId,
+        messages: { create: { role, content } }
+      },
+      update: {
+        updatedAt: new Date(),
+        messages: { create: { role, content } }
       }
     });
   } catch (error) {
@@ -202,7 +178,9 @@ export async function getConversationHistory(conversationId) {
   try {
     const messages = await prisma.message.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' }
+      // id (cuid) as tiebreaker: same-millisecond inserts (assistant tool_use +
+      // its tool_result) must keep their insert order or the history is invalid.
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
     });
 
     return messages;

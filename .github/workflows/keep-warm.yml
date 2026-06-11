@@ -5,6 +5,10 @@
 # Note: GitHub's scheduled crons are best-effort (often a few minutes late) and are
 # auto-disabled after 60 days of repo inactivity. For a hard guarantee, point an
 # uptime monitor (e.g. UptimeRobot, 5-min interval) at the same URL instead.
+#
+# This ping sends no Origin header; the chat route deliberately allows
+# Origin-less requests (the allowlist only guards cross-site browser use),
+# so this keeps working even with ALLOWED_ORIGINS set.
 name: keep-warm
 
 on:

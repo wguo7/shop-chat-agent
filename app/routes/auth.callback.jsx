@@ -7,11 +7,13 @@ export async function loader({ request }) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const [conversationId, shopId] = state.split("-");
 
-  if (!code) {
-    return new Response(JSON.stringify({ error: "Authorization code is missing" }), { status: 400 });
+  if (!code || !state) {
+    return new Response(JSON.stringify({ error: "Authorization code or state is missing" }), { status: 400 });
   }
+
+  // State format is `${conversationId}:${shopId}` (see auth.server.js).
+  const [conversationId, shopId] = state.split(":");
 
   try {
     // Exchange code for access token
@@ -91,7 +93,7 @@ export async function loader({ request }) {
  */
 async function exchangeCodeForToken(code, state) {
   const clientId = process.env.SHOPIFY_API_KEY;
-  const [conversationId, shopId] = state.split("-");
+  const [conversationId, shopId] = state.split(":");
   if (!clientId || !shopId) {
     throw new Error("SHOPIFY_CLIENT_ID and SHOPIFY_SHOP_ID environment variables are required");
   }
@@ -162,6 +164,6 @@ async function exchangeCodeForToken(code, state) {
  * @returns {Promise<string|null>} - The token URL or null if not found
  */
 async function getTokenUrl(conversationId) {
-  const { tokenUrl } = await getCustomerAccountUrls(conversationId);
+  const { tokenUrl } = (await getCustomerAccountUrls(conversationId)) || {};
   return tokenUrl;
 }

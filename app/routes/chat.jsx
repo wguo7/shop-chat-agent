@@ -12,7 +12,7 @@ import { getManualContext } from "../services/retrieval.server";
 
 
 /**
- * Rract Router loader function for handling GET requests
+ * React Router loader function for handling GET requests
  */
 export async function loader({ request }) {
   // Handle OPTIONS requests (CORS preflight)
@@ -32,12 +32,7 @@ export async function loader({ request }) {
     return handleHistoryRequest(request, url.searchParams.get('conversation_id'));
   }
 
-  // Handle SSE requests
-  if (!url.searchParams.has('history') && request.headers.get("Accept") === "text/event-stream") {
-    return handleChatRequest(request);
-  }
-
-  // API-only: reject all other requests
+  // API-only: chat requests are POSTs (see action); reject everything else.
   return new Response(JSON.stringify({ error: AppConfig.errorMessages.apiUnsupported }), { status: 400, headers: getCorsHeaders(request) });
 }
 
@@ -72,16 +67,22 @@ async function handleChatRequest(request) {
     const body = await request.json();
     const userMessage = body.message;
 
-    // Validate required message
-    if (!userMessage) {
+    // Validate required message (with a size cap — this is a public endpoint and
+    // every character is paid model input).
+    if (!userMessage || typeof userMessage !== "string" || userMessage.length > 4000) {
       return new Response(
         JSON.stringify({ error: AppConfig.errorMessages.missingMessage }),
-        { status: 400, headers: getSseHeaders(request) }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
 
-    // Generate or use existing conversation ID
-    const conversationId = body.conversation_id || Date.now().toString();
+    // Generate or use existing conversation ID. Must be unguessable: the ID is the
+    // only credential for reading history and for using any customer token bound
+    // to the conversation. Reject oversized client-supplied IDs.
+    const clientId = typeof body.conversation_id === "string" && body.conversation_id.length <= 64
+      ? body.conversation_id
+      : null;
+    const conversationId = clientId || crypto.randomUUID();
     const promptType = body.prompt_type || AppConfig.api.defaultPromptType;
 
     // Create a stream for the response
@@ -130,7 +131,9 @@ async function handleChatSession({
   // Initialize MCP client
   const shopId = request.headers.get("X-Shopify-Shop-Id");
   const shopDomain = request.headers.get("Origin");
-  const { mcpApiUrl } = await getCustomerAccountUrls(shopDomain, conversationId);
+  // Returns null on any failure (missing Origin, .well-known fetch error) — don't
+  // crash the whole session over it, the MCP client has endpoint fallbacks.
+  const { mcpApiUrl } = (await getCustomerAccountUrls(shopDomain, conversationId)) || {};
 
   const mcpClient = new MCPClient(
     shopDomain,
@@ -138,6 +141,18 @@ async function handleChatSession({
     shopId,
     mcpApiUrl,
   );
+
+  // Persist messages through a serial chain so DB insert order always matches
+  // conversation order. Fire-and-forget saves can interleave (e.g. a tool_result
+  // committing before the assistant tool_use that requested it), which makes the
+  // stored history invalid for the Claude API on every later turn.
+  let saveChain = Promise.resolve();
+  const persistMessage = (role, content) => {
+    saveChain = saveChain
+      .then(() => saveMessage(conversationId, role, content))
+      .catch((error) => console.error("Error saving message to database:", error));
+    return saveChain;
+  };
 
   try {
     // Send conversation ID to client
@@ -167,17 +182,16 @@ async function handleChatSession({
       : Promise.resolve(null);
 
     // Prepare conversation state
-    let conversationHistory = [];
-    let productsToDisplay = [];
+    const productsToDisplay = [];
 
-    // Save user message to the database
-    await saveMessage(conversationId, 'user', userMessage);
-
-    // Fetch all messages from the database for this conversation
+    // Fetch prior messages, then queue the current user message for persistence.
+    // The save chain keeps insert order correct, and appending in memory avoids
+    // a serialized save + full re-read of the conversation on the hot path.
     const dbMessages = await getConversationHistory(conversationId);
+    persistMessage('user', userMessage);
 
     // Format messages for Claude API
-    conversationHistory = dbMessages.map(dbMessage => {
+    const conversationHistory = dbMessages.map(dbMessage => {
       let content;
       try {
         content = JSON.parse(dbMessage.content);
@@ -189,6 +203,7 @@ async function handleChatSession({
         content
       };
     });
+    conversationHistory.push({ role: 'user', content: userMessage });
 
     // Retrieve NextLED manual context for this question and prepend it to the
     // current user turn, so there is a single user message carrying context +
@@ -243,7 +258,13 @@ async function handleChatSession({
     // user payload carrying the bare question.
     let finalMessage = { stop_reason: null };
 
-    while (finalMessage.stop_reason !== "end_turn") {
+    // Cap the loop: tool_use round-trips are normal, but an unexpected stop_reason
+    // (e.g. repeated max_tokens continuations) must never re-send the conversation
+    // unboundedly on a public, per-token-billed endpoint.
+    const maxIterations = 10;
+    let iterations = 0;
+
+    while (finalMessage.stop_reason !== "end_turn" && iterations++ < maxIterations) {
       finalMessage = await claudeService.streamConversation(
         {
           messages: conversationHistory,
@@ -266,10 +287,7 @@ async function handleChatSession({
               content: message.content
             });
 
-            saveMessage(conversationId, message.role, JSON.stringify(message.content))
-              .catch((error) => {
-                console.error("Error saving message to database:", error);
-              });
+            persistMessage(message.role, JSON.stringify(message.content));
 
             // Send a completion message
             stream.sendMessage({ type: 'message_complete' });
@@ -294,8 +312,21 @@ async function handleChatSession({
               tool_use_message: toolUseMessage
             });
 
-            // Call the tool
-            const toolUseResponse = await mcpClient.callTool(toolName, toolArgs);
+            // Call the tool. Never let a failure escape: the assistant's tool_use
+            // is already in the saved history, so throwing here would leave a
+            // dangling tool_use that makes the conversation invalid for the
+            // Claude API on every future turn.
+            let toolUseResponse;
+            try {
+              toolUseResponse = await mcpClient.callTool(toolName, toolArgs);
+            } catch (error) {
+              toolUseResponse = {
+                error: {
+                  type: "tool_error",
+                  data: `Tool ${toolName} failed: ${error.message}`
+                }
+              };
+            }
 
             // Handle tool response based on success/error
             if (toolUseResponse.error) {
@@ -305,7 +336,7 @@ async function handleChatSession({
                 toolUseId,
                 conversationHistory,
                 stream.sendMessage,
-                conversationId
+                persistMessage
               );
             } else {
               await toolService.handleToolSuccess(
@@ -314,7 +345,7 @@ async function handleChatSession({
                 toolUseId,
                 conversationHistory,
                 productsToDisplay,
-                conversationId
+                persistMessage
               );
             }
 
@@ -345,9 +376,9 @@ async function handleChatSession({
         products: productsToDisplay
       });
     }
-  } catch (error) {
-    // The streaming handler takes care of error handling
-    throw error;
+  } finally {
+    // Make sure all queued DB writes land before the invocation is released.
+    await saveChain;
   }
 }
 
@@ -413,8 +444,16 @@ function extractPrice(res, sku) {
       : null;
     const p = match || products[0];
     const min = p?.price_range?.min;
-    if (!min || min.amount == null) return null;
-    return `${p.title}: $${(Number(min.amount) / 100).toFixed(2)} ${min.currency || "USD"}`;
+    if (min == null) return null;
+    // Shape varies by store/API version: { amount, currency } in minor units,
+    // or a plain decimal string/number in major units.
+    if (typeof min === "object") {
+      if (min.amount == null) return null;
+      return `${p.title}: $${(Number(min.amount) / 100).toFixed(2)} ${min.currency || "USD"}`;
+    }
+    const amount = Number(min);
+    if (!Number.isFinite(amount)) return null;
+    return `${p.title}: $${amount.toFixed(2)} ${p.price_range.currency || "USD"}`;
   } catch {
     return null;
   }
@@ -448,19 +487,31 @@ async function fetchLivePrice(shopDomain, message) {
 }
 
 /**
+ * Parse the ALLOWED_ORIGINS env var into a list of origins.
+ * @returns {string[]}
+ */
+function allowedOrigins() {
+  return (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
  * Whether the request's Origin is allowed. If ALLOWED_ORIGINS is unset, all
  * origins are allowed (so the endpoint isn't broken before it's configured).
+ * Requests WITHOUT an Origin header are allowed: those are non-browser clients
+ * (e.g. the keep-warm ping), and an Origin check only protects against
+ * cross-site browser use — curl can fake any Origin regardless.
  * @param {Request} request
  * @returns {boolean}
  */
 function isOriginAllowed(request) {
-  const allowed = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const allowed = allowedOrigins();
   if (allowed.length === 0) return true;
   const origin = request.headers.get("Origin");
-  return !!origin && allowed.includes(origin);
+  if (!origin) return true;
+  return allowed.includes(origin);
 }
 
 /**
@@ -476,19 +527,24 @@ function forbidden(request) {
 }
 
 /**
- * Gets CORS headers for the response
+ * Gets CORS headers for the response. Only reflects the Origin when it is in the
+ * allowlist (or the allowlist is unset). No Allow-Credentials: nothing here uses
+ * cookies, and reflecting arbitrary origins WITH credentials is a classic
+ * cross-site data-leak misconfiguration.
  * @param {Request} request - The request object
  * @returns {Object} CORS headers object
  */
 function getCorsHeaders(request) {
-  const origin = request.headers.get("Origin") || "*";
-  const requestHeaders = request.headers.get("Access-Control-Request-Headers") || "Content-Type, Accept";
+  const origin = request.headers.get("Origin");
+  const allowed = allowedOrigins();
+  const allowOrigin = !origin
+    ? "*"
+    : (allowed.length === 0 || allowed.includes(origin)) ? origin : "null";
 
   return {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": requestHeaders,
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Headers": "Content-Type, Accept, X-Shopify-Shop-Id",
     "Access-Control-Max-Age": "86400" // 24 hours
   };
 }
@@ -499,15 +555,10 @@ function getCorsHeaders(request) {
  * @returns {Object} SSE headers object
  */
 function getSseHeaders(request) {
-  const origin = request.headers.get("Origin") || "*";
-
   return {
+    ...getCorsHeaders(request),
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
-    "Connection": "keep-alive",
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET,OPTIONS,POST",
-    "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+    "Connection": "keep-alive"
   };
 }

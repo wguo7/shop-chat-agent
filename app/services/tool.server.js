@@ -2,7 +2,6 @@
  * Tool Service
  * Manages tool execution and processing
  */
-import { saveMessage } from "../db.server";
 import AppConfig from "./config.server";
 
 /**
@@ -17,16 +16,16 @@ export function createToolService() {
    * @param {string} toolUseId - The ID of the tool use request
    * @param {Array} conversationHistory - The conversation history
    * @param {Function} sendMessage - Function to send messages to the client
-   * @param {string} conversationId - The conversation ID
+   * @param {Function} persistMessage - Ordered persistence callback (role, content)
    */
-  const handleToolError = async (toolUseResponse, toolName, toolUseId, conversationHistory, sendMessage, conversationId) => {
+  const handleToolError = async (toolUseResponse, toolName, toolUseId, conversationHistory, sendMessage, persistMessage) => {
     if (toolUseResponse.error.type === "auth_required") {
       console.log("Auth required for tool:", toolName);
-      await addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.error.data, conversationId);
+      await addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.error.data, persistMessage);
       sendMessage({ type: 'auth_required' });
     } else {
       console.log("Tool use error", toolUseResponse.error);
-      await addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.error.data, conversationId);
+      await addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.error.data, persistMessage);
     }
   };
 
@@ -37,15 +36,15 @@ export function createToolService() {
    * @param {string} toolUseId - The ID of the tool use request
    * @param {Array} conversationHistory - The conversation history
    * @param {Array} productsToDisplay - Array to add product results to
-   * @param {string} conversationId - The conversation ID
+   * @param {Function} persistMessage - Ordered persistence callback (role, content)
    */
-  const handleToolSuccess = async (toolUseResponse, toolName, toolUseId, conversationHistory, productsToDisplay, conversationId) => {
+  const handleToolSuccess = async (toolUseResponse, toolName, toolUseId, conversationHistory, productsToDisplay, persistMessage) => {
     // Check if this is a product search result
-    if (toolName === AppConfig.tools.productSearchName) {
+    if (AppConfig.tools.productSearchNames.includes(toolName)) {
       productsToDisplay.push(...processProductSearchResult(toolUseResponse));
     }
 
-    addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.content, conversationId);
+    await addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.content, persistMessage);
   };
 
   /**
@@ -115,9 +114,9 @@ export function createToolService() {
    * @param {Array} conversationHistory - The conversation history
    * @param {string} toolUseId - The ID of the tool use request
    * @param {string} content - The content of the tool result
-   * @param {string} conversationId - The conversation ID
+   * @param {Function} persistMessage - Ordered persistence callback (role, content)
    */
-  const addToolResultToHistory = async (conversationHistory, toolUseId, content, conversationId) => {
+  const addToolResultToHistory = async (conversationHistory, toolUseId, content, persistMessage) => {
     const toolResultMessage = {
       role: 'user',
       content: [{
@@ -131,12 +130,8 @@ export function createToolService() {
     conversationHistory.push(toolResultMessage);
 
     // Save to database with special format to indicate tool result
-    if (conversationId) {
-      try {
-        await saveMessage(conversationId, 'user', JSON.stringify(toolResultMessage.content));
-      } catch (error) {
-        console.error('Error saving tool result to database:', error);
-      }
+    if (persistMessage) {
+      await persistMessage('user', JSON.stringify(toolResultMessage.content));
     }
   };
 
