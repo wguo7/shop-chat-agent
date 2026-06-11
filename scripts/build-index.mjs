@@ -143,7 +143,11 @@ function splitLong(text, maxChars) {
 
 // Turn one file into labelled, self-contained chunks.
 function chunkFile(file, raw) {
-  const { data, content } = matter(raw);
+  // Normalize CRLF: with \r\n endings the `^## heading$` regexes never match
+  // (a trailing \r blocks `$`), and the whole file silently degrades into one
+  // unstructured blob split by length. 17 of the product files shipped that way
+  // in the 2026-06 index before this fix.
+  const { data, content } = matter(raw.replace(/\r\n/g, "\n"));
   const docType = data.doc_type || (data.sku ? "product" : "unknown");
   const baseSku = data.sku || null;
   const baseName = data.product_name || firstH1(content) || file;

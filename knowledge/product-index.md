@@ -30,7 +30,6 @@ This is a single comparison over all 29 NextLED products. Every value is pulled 
 | NT-7647 | Flexible Shaft LED Work Light | Mechanic Work Lights | standard |  | 200 lm | Flexible shaft with zoom head on AA power | Hands free light in tight spots |
 | NT-7647-1 | Flexible Shaft LED Task Light with Magnetic Pick-Up Tool | Mechanic Work Lights | standard |  | 300 lm | Magnetic pick up head lifts 1 lb and extends 24 in | Lighting while retrieving dropped metal parts |
 | NT-6615 | Spot Flood and UV Pen Light | Mechanic Work Lights | standard |  | 300 lm | 3 in 1 pen with no CRI rating | Pocket spot, flood, and UV for mechanics |
-| NT-6926 | Dual Power Tripod LED Work Light | Mechanic Work Lights | standard |  | 5000 lm | Telescoping tripod with a removable magnetic head | Lighting a whole work area from a tripod |
 | NT-6786 | Pocket LED Task Light with Spot Light | Mechanic Work Lights | standard |  | 500 lm | Pocket task light and spot with a power bank | Pocket close up work with phone charging |
 | NT-2061A-10UV | Rechargeable Handheld Bar LED and UV Work Light | Mechanic Work Lights | standard |  | 1000 lm | Handheld bar with a UV leak mode and two hooks | General shop tasks plus leak checking |
 | NT-6598 | Multi-Function Spot and Wide Beam Headlamp | Mechanic Work Lights | standard |  | 300 lm | 3 light headlamp with red and a rear tail light | Hands free head lighting for repair and outdoors |
@@ -57,7 +56,7 @@ This is a single comparison over all 29 NextLED products. Every value is pulled 
 The color match lights are the NT-7885M, NT-6692M, NT-2040B-3, NT-1010UV, NT-R3202, NT-V3505, NT-6615K, and NT-2143C-B. For critical color matching, the two ULTIMATE choices stand out. Pick the NT-6692M for the most color temperatures, five at CRI 96 plus with a memory function, or the NT-7885M for the brightest inspection at CRI 95 plus and up to 1500 lm.
 
 **Which NextLED light is the brightest?**
-The NT-6926M is the brightest at 6000 lm on high, followed by the NT-6926 at 5000 lm. Among the color match lights the NT-1010UV reaches 2000 lm and the NT-7885M reaches 1500 lm in Turbo.
+The NT-6926M is the brightest at 6000 lm on high. Among the color match lights the NT-1010UV reaches 2000 lm and the NT-7885M reaches 1500 lm in Turbo.
 
 **Which NextLED light works under a car?**
 The NT-6648, the 10 inch triple light mode under car work light, rolls under a car on steel wheels with a disc flood, a flexible detail arm, and a UV mode.
