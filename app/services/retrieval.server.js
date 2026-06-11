@@ -46,6 +46,18 @@ function detectSkus(text, catalog) {
 }
 
 /**
+ * Detect product SKUs referenced in free text (by SKU code, product name, alias,
+ * or multi-word keyword from the index catalog). First-seen order. Exported for
+ * the price prefetch, so "what is the price" can resolve to the product being
+ * discussed instead of searching the catalog for the literal question text.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function detectProductSkus(text) {
+  return detectSkus(text || "", indexData?.catalog || []);
+}
+
+/**
  * Build manual context for a query. Always includes a catalog overview of all
  * products. For details it takes the semantic top-K for the CURRENT question
  * first (so an accessory/policy answer is never crowded out), then force-includes

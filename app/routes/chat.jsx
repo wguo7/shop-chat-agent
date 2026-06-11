@@ -8,7 +8,7 @@ import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server";
 import { createToolService } from "../services/tool.server";
-import { getManualContext } from "../services/retrieval.server";
+import { getManualContext, detectProductSkus } from "../services/retrieval.server";
 import { embedQuery } from "../services/voyage.server";
 
 // Customer-account URLs (.well-known endpoints) are shop-wide, not per
@@ -184,14 +184,22 @@ async function handleChatSession({
       console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
     });
 
-    // For price/availability questions, kick off a live price lookup NOW, in parallel
-    // (a direct call to the storefront search that does not wait on the connect above).
-    // It hides under the DB + retrieval latency below, so price questions are no slower.
-    const pricePromise = /\b(price|prices|cost|costs|how much|pricing|msrp|\$)\b/i.test(userMessage)
-      ? fetchLivePrice(shopDomain, userMessage).catch((error) => {
-          console.warn("Price prefetch failed:", error.message);
-          return null;
-        })
+    // For price/availability questions, prefetch the live price via a direct
+    // storefront search (no connect wait). Only search when we know WHICH
+    // product: a generic query like "what is the price" returns an arbitrary
+    // catalog item, which then gets confidently relayed as the wrong answer.
+    // If the message names a product, start now (hides under the DB + retrieval
+    // latency below); for follow-ups, resolve the product from recent
+    // conversation once history is loaded (see below).
+    const priceIntent = /\b(price|prices|cost|costs|how much|pricing|msrp|\$)\b/i.test(userMessage);
+    const startPriceLookup = (term) =>
+      fetchLivePrice(shopDomain, term).catch((error) => {
+        console.warn("Price prefetch failed:", error.message);
+        return null;
+      });
+    const messageRefs = priceIntent ? detectProductSkus(userMessage) : [];
+    let pricePromise = messageRefs.length
+      ? startPriceLookup(messageRefs[0])
       : Promise.resolve(null);
 
     // Prepare conversation state
@@ -254,6 +262,21 @@ async function handleChatSession({
           ? content
           : "";
     const recentText = conversationHistory.slice(-7, -1).map((m) => toText(m.content)).join(" ");
+
+    // Follow-up price questions ("what is the price?") name no product; resolve
+    // the most recently discussed product from the conversation and look that
+    // up instead. The last explicit SKU in the transcript (usually from the
+    // assistant's own answer) beats name/alias matches, which can hit sibling
+    // models. Overlaps with the retrieval await below. If no product can be
+    // identified at all, skip the prefetch — the model will use search_catalog
+    // or ask, rather than relay an arbitrary product's price.
+    if (priceIntent && !messageRefs.length) {
+      const skuMentions = [...recentText.matchAll(/\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/gi)].map((m) => m[0]);
+      const contextRef = skuMentions[skuMentions.length - 1] || detectProductSkus(recentText)[0];
+      if (contextRef) {
+        pricePromise = startPriceLookup(contextRef);
+      }
+    }
 
     const manualContext = await getManualContext(userMessage, recentText, embeddingPromise);
     if (manualContext) {
