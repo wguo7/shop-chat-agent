@@ -547,13 +547,24 @@ async function fetchLivePrice(shopDomain, message) {
 }
 
 /**
- * Parse the ALLOWED_ORIGINS env var into a list of origins.
+ * Parse the ALLOWED_ORIGINS env var into a list of origins. Entries are
+ * normalized (scheme added if missing, path/trailing slash dropped, quotes
+ * stripped) so common formatting slips — "nextool.myshopify.com/" vs
+ * "https://nextool.myshopify.com" — don't silently break the whole widget.
  * @returns {string[]}
  */
 function allowedOrigins() {
   return (process.env.ALLOWED_ORIGINS || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean)
+    .map((s) => {
+      try {
+        return new URL(s.includes("://") ? s : `https://${s}`).origin;
+      } catch {
+        return null;
+      }
+    })
     .filter(Boolean);
 }
 
