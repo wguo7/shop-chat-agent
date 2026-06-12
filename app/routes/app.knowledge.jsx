@@ -6,9 +6,44 @@
  * Contents read/write on the repo).
  */
 import { useState } from "react";
-import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
+import { useLoaderData, useActionData, useNavigation, Form, Link } from "react-router";
 import { authenticate } from "../shopify.server";
 import AppConfig from "../services/config.server";
+
+// Structured-manual skeleton the "Load template" button drops into the text
+// box. Sections become individually searchable chunks; the Common questions
+// entries are the highest-value part (each Q&A is its own chunk).
+const STRUCTURED_TEMPLATE = `## What it is
+One short paragraph: what the product is, what jobs it is for, and what makes it different.
+
+## Specifications
+| Spec | Value |
+| --- | --- |
+| Brightness high | XXXX lm |
+| Brightness low | XXX lm |
+| Battery | X.XV XXXX mAh lithium-ion |
+| Charging time | X hrs |
+| Runtime | X hrs high, X hrs low |
+
+## Common questions
+**How long does the battery last on the NT-XXXX?**
+Answer in one or two sentences.
+
+**How do I charge the NT-XXXX and how long does it take?**
+Answer.
+
+**What comes in the box with the NT-XXXX?**
+Answer.
+
+**What is the NT-XXXX best used for?**
+Answer.
+
+## Warranty
+1 year limited warranty.
+
+## Full manual text (verbatim)
+Paste the full manual text here, in reading order: specifications, operation, charging, troubleshooting, warranty.
+`;
 
 const GH_API = "https://api.github.com";
 // Files that must not be deleted from the admin UI: internal docs plus the
@@ -29,23 +64,41 @@ function ghUrl(path) {
   return `${GH_API}/repos/${githubRepo}/contents/knowledge/${path}?ref=${githubBranch}`;
 }
 
+function isSafeName(name) {
+  return Boolean(name) && name.endsWith(".md") && !name.includes("/") && !name.includes("..");
+}
+
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
 
   if (!process.env.GITHUB_TOKEN) {
-    return { configured: false, files: [] };
+    return { configured: false, files: [], editing: null };
   }
 
-  const res = await fetch(ghUrl(""), { headers: ghHeaders() });
-  if (!res.ok) {
-    return { configured: true, error: `GitHub API error ${res.status}`, files: [] };
+  // ?edit=<file>.md opens that file's content in the editor section.
+  const url = new URL(request.url);
+  const editName = url.searchParams.get("edit");
+  const safeEdit = isSafeName(editName) ? editName : null;
+
+  const [listRes, editRes] = await Promise.all([
+    fetch(ghUrl(""), { headers: ghHeaders() }),
+    safeEdit ? fetch(ghUrl(safeEdit), { headers: ghHeaders() }) : Promise.resolve(null),
+  ]);
+  if (!listRes.ok) {
+    return { configured: true, error: `GitHub API error ${listRes.status}`, files: [], editing: null };
   }
-  const entries = await res.json();
+  const entries = await listRes.json();
   const files = entries
     .filter((e) => e.type === "file" && e.name.endsWith(".md") && !["_TEMPLATE.md", "STYLE.md"].includes(e.name))
     .map((e) => ({ name: e.name, sha: e.sha, size: e.size, protected: PROTECTED_FILES.has(e.name) }));
 
-  return { configured: true, files };
+  let editing = null;
+  if (editRes && editRes.ok) {
+    const j = await editRes.json();
+    editing = { name: safeEdit, sha: j.sha, content: Buffer.from(j.content, "base64").toString("utf8") };
+  }
+
+  return { configured: true, files, editing };
 };
 
 export const action = async ({ request }) => {
@@ -57,10 +110,32 @@ export const action = async ({ request }) => {
   const { githubBranch } = AppConfig.admin;
 
   try {
+    if (intent === "save-file") {
+      const name = String(form.get("name") || "");
+      const sha = String(form.get("sha") || "");
+      const content = String(form.get("content") || "");
+      if (!isSafeName(name)) return { ok: false, message: "Invalid file." };
+      if (!content.startsWith("---") || content.trim().length < 100) {
+        return { ok: false, message: "Not saved: the file must keep its header (the --- block at the top) and its content. Cancel and re-open it to start over." };
+      }
+      const res = await fetch(ghUrl(name).split("?")[0], {
+        method: "PUT",
+        headers: ghHeaders(),
+        body: JSON.stringify({
+          message: `kb: edit ${name} via admin`,
+          content: Buffer.from(content, "utf8").toString("base64"),
+          branch: githubBranch,
+          sha,
+        }),
+      });
+      if (!res.ok) return { ok: false, message: `Save failed: ${res.status} ${await res.text()}` };
+      return { ok: true, message: `${name} saved. The bot updates automatically in ~5 minutes.` };
+    }
+
     if (intent === "delete") {
       const name = String(form.get("name") || "");
       const sha = String(form.get("sha") || "");
-      if (!name.endsWith(".md") || PROTECTED_FILES.has(name) || name.includes("/") || name.includes("..")) {
+      if (!isSafeName(name) || PROTECTED_FILES.has(name)) {
         return { ok: false, message: "Invalid file." };
       }
       const res = await fetch(ghUrl(name).split("?")[0], {
@@ -95,6 +170,10 @@ export const action = async ({ request }) => {
         const keywordLines = keywords
           ? keywords.split(",").map((k) => `  - ${k.trim()}`).filter((k) => k.trim() !== "-").join("\n")
           : `  - ${sku}`;
+        // If the pasted text already has "## Section" headings (e.g. from the
+        // structured template), keep them as the file's sections; otherwise
+        // wrap the whole paste as one Manual section.
+        const body = /^##\s/m.test(content) ? content : `## Manual\n${content}`;
         fileBody = [
           "---",
           `sku: ${sku}`,
@@ -104,8 +183,7 @@ export const action = async ({ request }) => {
           "---",
           `# ${productName} (${sku})`,
           "",
-          "## Manual",
-          content,
+          body,
           "",
         ].join("\n");
       }
@@ -141,11 +219,16 @@ const inputStyle = { padding: "8px", border: "1px solid #8a8a8a", borderRadius: 
 const buttonStyle = { padding: "8px 16px", borderRadius: "8px", border: "1px solid #8a8a8a", background: "#ffffff", cursor: "pointer", fontSize: "13px" };
 
 export default function Knowledge() {
-  const { configured, error, files } = useLoaderData();
+  const { configured, error, files, editing } = useLoaderData();
   const actionData = useActionData();
   const navigation = useNavigation();
   const busy = navigation.state === "submitting";
   const [manualText, setManualText] = useState("");
+
+  const loadTemplate = () => {
+    if (manualText.trim() && !confirm("Replace the text box contents with the structured template?")) return;
+    setManualText(STRUCTURED_TEMPLATE);
+  };
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
@@ -177,6 +260,39 @@ export default function Knowledge() {
       {actionData && (
         <s-section>
           <s-text tone={actionData.ok ? "success" : "critical"}>{actionData.message}</s-text>
+        </s-section>
+      )}
+
+      {editing && (
+        <s-section heading={`Editing ${editing.name}`}>
+          <Form method="post">
+            <input type="hidden" name="intent" value="save-file" />
+            <input type="hidden" name="name" value={editing.name} />
+            <input type="hidden" name="sha" value={editing.sha} />
+            <div style={{ display: "grid", gap: "10px" }}>
+              <s-text tone="subdued">
+                The block between the two --- lines at the top controls product matching
+                (sku, product_name, keywords) — edit values, but keep the structure.
+                Everything below it is what the bot reads when answering. Each
+                "## Section" becomes its own searchable piece; the entries under
+                "## Common questions" (bold question, then answer) are the most
+                effective way to add answers, written the way customers actually ask.
+              </s-text>
+              <textarea
+                name="content"
+                defaultValue={editing.content}
+                rows={26}
+                style={{ ...inputStyle, fontFamily: "monospace" }}
+                required
+              />
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                <button type="submit" disabled={busy} style={buttonStyle}>
+                  {busy ? "Saving..." : "Save changes"}
+                </button>
+                <Link to="/app/knowledge">Cancel</Link>
+              </div>
+            </div>
+          </Form>
         </s-section>
       )}
 
@@ -222,9 +338,18 @@ export default function Knowledge() {
                 sections so each reads top to bottom. Alternatively, choose a .md or
                 .txt file and it will fill the box for you.
               </s-text>
-              <div>
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                 <input type="file" accept=".md,.txt" onChange={handleFile} />
+                <button type="button" onClick={loadTemplate} style={buttonStyle}>
+                  Load structured template
+                </button>
               </div>
+              <s-text tone="subdued">
+                The template adds labeled sections (Specifications table, Common
+                questions, Warranty) that make answers noticeably more precise —
+                recommended for important products. Fill in the placeholders and
+                delete sections you don't need. Plain pasted text works fine too.
+              </s-text>
               <textarea
                 name="content"
                 value={manualText}
@@ -274,6 +399,9 @@ export default function Knowledge() {
               <tr key={f.name}>
                 <td style={cellStyle}><s-text>{f.name}</s-text></td>
                 <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
+                  <Link to={`/app/knowledge?edit=${encodeURIComponent(f.name)}`}>Edit</Link>
+                </td>
+                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
                   {f.protected ? (
                     <s-text tone="subdued">core file — cannot be removed</s-text>
                   ) : (
@@ -296,6 +424,32 @@ export default function Knowledge() {
             ))}
           </tbody>
         </table>
+      </s-section>
+
+      <s-section heading="Where everything else lives">
+        <s-stack gap="base">
+          <s-paragraph>
+            <s-text fontWeight="bold">Store-wide answers</s-text>
+            <s-text>
+              {" "}— returns, shipping, contact info, coupon codes, and the redirect
+              links (accessories page, manual downloads, become-a-distributor,
+              affiliate program, warranty registration) all live in
+              company-and-policies.md — click Edit on it above. To teach the bot a
+              new store-wide answer, add an entry to its Common questions section,
+              written the way customers actually ask.
+            </s-text>
+          </s-paragraph>
+          <s-paragraph>
+            <s-text fontWeight="bold">The bot's personality and hard rules</s-text>
+            <s-text>
+              {" "}— tone, never inventing prices, no purchasing in chat, the
+              not-sure fallback, and a second copy of the five standard redirect
+              links live in app/prompts/prompts.json in the GitHub repo. If you
+              change a redirect URL in the policies file, update it there too (or
+              ask whoever manages the repo).
+            </s-text>
+          </s-paragraph>
+        </s-stack>
       </s-section>
     </s-page>
   );
