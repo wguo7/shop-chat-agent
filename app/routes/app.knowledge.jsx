@@ -11,8 +11,10 @@ import { authenticate } from "../shopify.server";
 import AppConfig from "../services/config.server";
 
 const GH_API = "https://api.github.com";
-// Internal docs that must not be deleted from the admin UI.
-const PROTECTED_FILES = new Set(["_TEMPLATE.md", "STYLE.md"]);
+// Files that must not be deleted from the admin UI: internal docs plus the
+// company-wide knowledge files (policies, catalog comparison) that the bot
+// depends on for non-product questions.
+const PROTECTED_FILES = new Set(["_TEMPLATE.md", "STYLE.md", "company-and-policies.md", "product-index.md"]);
 
 function ghHeaders() {
   return {
@@ -40,8 +42,8 @@ export const loader = async ({ request }) => {
   }
   const entries = await res.json();
   const files = entries
-    .filter((e) => e.type === "file" && e.name.endsWith(".md") && !PROTECTED_FILES.has(e.name))
-    .map((e) => ({ name: e.name, sha: e.sha, size: e.size }));
+    .filter((e) => e.type === "file" && e.name.endsWith(".md") && !["_TEMPLATE.md", "STYLE.md"].includes(e.name))
+    .map((e) => ({ name: e.name, sha: e.sha, size: e.size, protected: PROTECTED_FILES.has(e.name) }));
 
   return { configured: true, files };
 };
@@ -272,19 +274,23 @@ export default function Knowledge() {
               <tr key={f.name}>
                 <td style={cellStyle}><s-text>{f.name}</s-text></td>
                 <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
-                  <Form
-                    method="post"
-                    onSubmit={(e) => {
-                      if (!confirm(`Remove ${f.name}? The bot will stop knowing about this product.`)) e.preventDefault();
-                    }}
-                  >
-                    <input type="hidden" name="intent" value="delete" />
-                    <input type="hidden" name="name" value={f.name} />
-                    <input type="hidden" name="sha" value={f.sha} />
-                    <button type="submit" disabled={busy} style={{ ...buttonStyle, color: "#b91c1c" }}>
-                      Remove
-                    </button>
-                  </Form>
+                  {f.protected ? (
+                    <s-text tone="subdued">core file — cannot be removed</s-text>
+                  ) : (
+                    <Form
+                      method="post"
+                      onSubmit={(e) => {
+                        if (!confirm(`Remove ${f.name}? The bot will stop knowing about this product.`)) e.preventDefault();
+                      }}
+                    >
+                      <input type="hidden" name="intent" value="delete" />
+                      <input type="hidden" name="name" value={f.name} />
+                      <input type="hidden" name="sha" value={f.sha} />
+                      <button type="submit" disabled={busy} style={{ ...buttonStyle, color: "#b91c1c" }}>
+                        Remove
+                      </button>
+                    </Form>
+                  )}
                 </td>
               </tr>
             ))}
