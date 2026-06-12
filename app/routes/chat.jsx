@@ -272,14 +272,24 @@ async function handleChatSession({
 
     // Follow-up price questions ("what is the price?") name no product; resolve
     // the most recently discussed product from the conversation and look that
-    // up instead. The last explicit SKU in the transcript (usually from the
-    // assistant's own answer) beats name/alias matches, which can hit sibling
-    // models. Overlaps with the retrieval await below. If no product can be
-    // identified at all, skip the prefetch — the model will use search_catalog
-    // or ask, rather than relay an arbitrary product's price.
+    // up instead. SKUs from the CUSTOMER's own messages outrank ones from
+    // assistant answers — an answer often mentions sibling models in passing
+    // ("the nearest model is the NT-6763"), and picking those up returns the
+    // wrong product's price. Overlaps with the retrieval await below. If no
+    // product can be identified at all, skip the prefetch — the model will use
+    // search_catalog or ask, rather than relay an arbitrary product's price.
     if (priceIntent && !messageRefs.length) {
-      const skuMentions = [...recentText.matchAll(/\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/gi)].map((m) => m[0]);
-      const contextRef = skuMentions[skuMentions.length - 1] || detectProductSkus(recentText)[0];
+      const skuRe = /\bNT-[0-9A-Z]+(?:-[0-9A-Z]+)*\b/gi;
+      const lastSkuIn = (text) => {
+        const all = [...(text || "").matchAll(skuRe)].map((m) => m[0]);
+        return all[all.length - 1];
+      };
+      const recentByRole = (role) =>
+        conversationHistory.slice(-7, -1).filter((m) => m.role === role).map((m) => toText(m.content)).join(" ");
+      const contextRef =
+        lastSkuIn(recentByRole("user")) ||
+        lastSkuIn(recentByRole("assistant")) ||
+        detectProductSkus(recentText)[0];
       if (contextRef) {
         pricePromise = startPriceLookup(contextRef);
       }
