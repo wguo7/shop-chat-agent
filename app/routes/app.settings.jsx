@@ -1,5 +1,5 @@
 /**
- * Admin: Settings — rotate API keys and the domain allowlist without the
+ * Admin: Settings: rotate API keys and the domain allowlist without the
  * Vercel dashboard. Updates the env var via the Vercel API and triggers a
  * production redeploy so it takes effect. Write-only: existing values are
  * never displayed. Behind Shopify admin auth. Needs VERCEL_TOKEN in env.
@@ -26,8 +26,6 @@ const KEY_DESCRIPTIONS = {
   CLAUDE_API_KEY: "Anthropic API key the chat answers with (console.anthropic.com)",
   VOYAGE_API_KEY: "Voyage AI key for manual search embeddings (dash.voyageai.com). If you change it, also update the VOYAGE_API_KEY secret on GitHub (repo Settings > Secrets > Actions) so manual uploads keep working.",
   ALLOWED_ORIGINS: "Store domains allowed to use the chat, comma-separated (e.g. https://nextool.myshopify.com,https://mynextled.com)",
-  GITHUB_TOKEN: "GitHub token powering the Knowledge page (github.com > Settings > Developer settings > Fine-grained tokens; scope to this repo only, Contents read/write).",
-  VERCEL_TOKEN: "Vercel token powering this Settings page (vercel.com/account/tokens). If you change it, also update the VERCEL_TOKEN secret on GitHub so manual uploads keep deploying.",
 };
 
 export const loader = async ({ request }) => {
@@ -53,7 +51,7 @@ export const action = async ({ request }) => {
 
   try {
     // Find the env var's id (names/ids only; values are not readable for
-    // sensitive vars, which is fine — this page is write-only).
+    // sensitive vars, which is fine; this page is write-only).
     const listRes = await fetch(vcUrl(`/v9/projects/${vercelProjectId}/env`), { headers: vcHeaders() });
     if (!listRes.ok) return { ok: false, message: `Vercel API error ${listRes.status}` };
     const { envs } = await listRes.json();
@@ -87,7 +85,7 @@ export const action = async ({ request }) => {
       if (!redeploy.ok) {
         return {
           ok: true,
-          message: `${key} saved, but auto-redeploy failed — click "Redeploy" on the latest deployment in the Vercel dashboard to apply it.`,
+          message: `${key} saved, but auto-redeploy failed: click "Redeploy" on the latest deployment in the Vercel dashboard to apply it.`,
         };
       }
     }

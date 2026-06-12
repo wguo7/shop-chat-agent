@@ -1,5 +1,5 @@
 /**
- * Admin: Knowledge base manager — upload, edit, and remove the bot's product
+ * Admin: Knowledge base manager: upload, edit, and remove the bot's product
  * manuals and store-wide answers without touching GitHub. Files are committed
  * to the repo via the GitHub API, which triggers the rebuild-index workflow
  * (re-embed + deploy, ~5 minutes). Behind Shopify admin auth. Needs
@@ -129,7 +129,7 @@ export const action = async ({ request }) => {
         }),
       });
       if (!res.ok) return { ok: false, message: `Save failed: ${res.status} ${await res.text()}` };
-      return { ok: true, message: `${name} saved — live in ~5 minutes.` };
+      return { ok: true, message: `${name} saved. Live in about 5 minutes.` };
     }
 
     if (intent === "delete") {
@@ -148,7 +148,7 @@ export const action = async ({ request }) => {
         }),
       });
       if (!res.ok) return { ok: false, message: `Delete failed: ${res.status} ${await res.text()}` };
-      return { ok: true, message: `${name} removed — live in ~5 minutes.` };
+      return { ok: true, message: `${name} removed. Live in about 5 minutes.` };
     }
 
     if (intent === "upload") {
@@ -203,7 +203,7 @@ export const action = async ({ request }) => {
         }),
       });
       if (!res.ok) return { ok: false, message: `Upload failed: ${res.status} ${await res.text()}` };
-      return { ok: true, message: `${name} ${sha ? "updated" : "added"} — live in ~5 minutes (Actions tab on GitHub shows progress).` };
+      return { ok: true, message: `${name} ${sha ? "updated" : "added"}. Live in about 5 minutes (Actions tab on GitHub shows progress).` };
     }
 
     return { ok: false, message: "Unknown action." };
@@ -308,7 +308,7 @@ export default function Knowledge() {
                 name="content"
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
-                placeholder={"Paste the manual text (copy it out of the PDF — PDFs can't be uploaded directly). Specs, operation, charging, troubleshooting, warranty are the parts that matter."}
+                placeholder={"Paste the manual text (copy it out of the PDF; PDFs can't be uploaded directly). Specs, operation, charging, troubleshooting, warranty are the parts that matter."}
                 rows={12}
                 style={{ ...inputStyle, fontFamily: "monospace" }}
                 required
@@ -324,12 +324,9 @@ export default function Knowledge() {
             <details>
               <summary style={{ fontSize: "12px", color: "#666", cursor: "pointer" }}>Tips</summary>
               <div style={{ fontSize: "12px", color: "#555", lineHeight: 1.5, paddingTop: "6px" }}>
-                Re-using an existing SKU replaces that product's manual. Customer phrases are what
-                shoppers say instead of the SKU. After pasting from a two-column PDF, skim it — if
-                lines jump between topics, reorder the sections. Template inserts the recommended
-                structure (specs table, Q&amp;A) — fill placeholders, delete unused sections.
-                Choosing a .md/.txt file fills the box. Saves go live in ~5 minutes; test by asking
-                the chat on the storefront.
+                Re-using a SKU replaces that manual. Customer phrases are what shoppers say instead
+                of the SKU. Check that pasted PDF text reads in order. Template inserts the
+                recommended structure. Saves go live in about 5 minutes; test on the storefront chat.
               </div>
             </details>
           </div>
@@ -372,7 +369,7 @@ export default function Knowledge() {
         <s-paragraph>
           <s-text tone="subdued">
             Store-wide answers and redirect links: edit company-and-policies.md. Bot tone and hard
-            rules: app/prompts/prompts.json in the repo (redirect URLs live in both — change both).
+            rules: app/prompts/prompts.json in the repo (redirect URLs live in both, change both).
           </s-text>
         </s-paragraph>
       </s-section>
