@@ -124,14 +124,18 @@ export async function getManualContext(query, contextText = "", embeddingPromise
       console.warn("Voyage embedder failed; using catalog + reference matches only:", e.message);
     }
 
-    // 2) Force-include the product named in the current message, then any from
-    //    recent context, until the cap is reached. Verbatim manual-text parts
-    //    are excluded here (they're long and procedural); semantic search still
-    //    surfaces them when the question actually needs a procedure.
+    // 2) Force-include chunks for the product named in the current message,
+    //    then any from recent context, until the cap is reached. The product's
+    //    chunks are added in order of their semantic relevance to the CURRENT
+    //    question, so a "how do I use the remote" question pulls the manual's
+    //    remote-use section while a spec question pulls the spec table —
+    //    instead of whatever happens to come first in the file. Falls back to
+    //    file order (curated sections first) if the embedder failed.
+    const scoreById = new Map(ranked.map((r) => [r.c.id, r.score]));
     const forceSku = (sku) => {
-      for (const c of chunks) {
-        if (c.sku && c.sku.toUpperCase() === sku && !/^Full manual text/.test(c.section || "")) take(c);
-      }
+      const productChunks = chunks.filter((c) => c.sku && c.sku.toUpperCase() === sku);
+      productChunks.sort((a, b) => (scoreById.get(b.id) ?? -1) - (scoreById.get(a.id) ?? -1));
+      for (const c of productChunks) take(c);
     };
     for (const sku of curRefs) forceSku(sku);
     for (const sku of ctxRefs) forceSku(sku);
