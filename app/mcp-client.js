@@ -1,5 +1,6 @@
 import { generateAuthUrl } from "./auth.server";
 import { getCustomerToken } from "./db.server";
+import toolsSnapshot from "../data/mcp-tools.json";
 
 // Module-level cache of formatted tool lists per MCP endpoint. Tool definitions are
 // store-wide and change rarely, so reuse them across requests (warm instances, via
@@ -17,6 +18,15 @@ function getCachedTools(endpoint) {
 
 function setCachedTools(endpoint, tools) {
   if (Array.isArray(tools) && tools.length) TOOLS_CACHE.set(endpoint, { tools, ts: Date.now() });
+}
+
+// Build-time snapshot of the tool lists (data/mcp-tools.json, already filtered
+// of cart/checkout tools). New function instances use it instantly instead of
+// paying a tools/list round-trip on their first message; a background refresh
+// corrects any drift and populates the in-memory cache.
+function getSnapshotTools(endpoint) {
+  const tools = toolsSnapshot?.endpoints?.[endpoint];
+  return Array.isArray(tools) && tools.length ? tools : null;
 }
 
 /**
@@ -59,6 +69,14 @@ class MCPClient {
         this.customerTools = cached;
         this.tools = [...this.tools, ...cached];
         return cached;
+      }
+
+      const snapshot = getSnapshotTools(this.customerMcpEndpoint);
+      if (snapshot) {
+        this.customerTools = snapshot;
+        this.tools = [...this.tools, ...snapshot];
+        this._refreshToolsInBackground(this.customerMcpEndpoint);
+        return snapshot;
       }
 
       console.log(`Connecting to MCP server at ${this.customerMcpEndpoint}`);
@@ -115,6 +133,14 @@ class MCPClient {
         this.storefrontTools = cached;
         this.tools = [...this.tools, ...cached];
         return cached;
+      }
+
+      const snapshot = getSnapshotTools(this.storefrontMcpEndpoint);
+      if (snapshot) {
+        this.storefrontTools = snapshot;
+        this.tools = [...this.tools, ...snapshot];
+        this._refreshToolsInBackground(this.storefrontMcpEndpoint);
+        return snapshot;
       }
 
       console.log(`Connecting to MCP server at ${this.storefrontMcpEndpoint}`);
@@ -268,6 +294,25 @@ class MCPClient {
         }
       };
     }
+  }
+
+  /**
+   * Refresh an endpoint's tool list in the background (fire-and-forget) so the
+   * snapshot can be served instantly while drift still self-corrects into the
+   * in-memory cache for subsequent requests.
+   *
+   * @private
+   * @param {string} endpoint - The MCP endpoint URL
+   */
+  _refreshToolsInBackground(endpoint) {
+    this._makeJsonRpcRequest(endpoint, "tools/list", {}, { "Content-Type": "application/json" })
+      .then((response) => {
+        const toolsData = response.result?.tools || [];
+        setCachedTools(endpoint, this._formatToolsData(toolsData));
+      })
+      .catch((error) => {
+        console.warn(`Background tools refresh failed for ${endpoint}:`, error.message);
+      });
   }
 
   /**

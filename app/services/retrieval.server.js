@@ -8,6 +8,17 @@ import indexData from "../../data/manual-index.json";
 import { embedQuery } from "./voyage.server";
 import AppConfig from "./config.server";
 
+// Decode the base64 Float32Array embeddings once at module load (much faster
+// than parsing millions of JSON numbers on cold start). Falls back to the old
+// plain-array format if the index predates the binary encoding.
+const CHUNKS = (indexData?.chunks || []).map((c) => {
+  if (c.embedding_b64) {
+    const buf = Buffer.from(c.embedding_b64, "base64");
+    return { ...c, embedding: new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4) };
+  }
+  return c;
+});
+
 // Embeddings are unit-normalized at index and query time, so cosine == dot product.
 function dot(a, b) {
   let s = 0;
@@ -58,6 +69,16 @@ export function detectProductSkus(text) {
 }
 
 /**
+ * The compact one-line-per-product catalog overview. Stable per deployment, so
+ * the Claude service puts it inside the CACHED system block instead of paying
+ * for it as uncached per-request context on every message.
+ * @returns {string}
+ */
+export function getCatalogSummary() {
+  return indexData?.catalogSummary || "";
+}
+
+/**
  * Build manual context for a query. Always includes a catalog overview of all
  * products. For details it takes the semantic top-K for the CURRENT question
  * first (so an accessory/policy answer is never crowded out), then force-includes
@@ -71,13 +92,12 @@ export function detectProductSkus(text) {
  */
 export async function getManualContext(query, contextText = "", embeddingPromise = null) {
   try {
-    const chunks = indexData?.chunks;
+    const chunks = CHUNKS;
     if (!chunks?.length) {
       console.warn("Manual index empty/missing; retrieval disabled.");
       return null;
     }
     const catalog = indexData.catalog || [];
-    const catalogSummary = indexData.catalogSummary || "";
 
     const topK = AppConfig.retrieval?.topK ?? 6;
     const minScore = AppConfig.retrieval?.minScore ?? 0.4;
@@ -105,16 +125,20 @@ export async function getManualContext(query, contextText = "", embeddingPromise
     }
 
     // 2) Force-include the product named in the current message, then any from
-    //    recent context, until the cap is reached.
+    //    recent context, until the cap is reached. Verbatim manual-text parts
+    //    are excluded here (they're long and procedural); semantic search still
+    //    surfaces them when the question actually needs a procedure.
     const forceSku = (sku) => {
-      for (const c of chunks) if (c.sku && c.sku.toUpperCase() === sku) take(c);
+      for (const c of chunks) {
+        if (c.sku && c.sku.toUpperCase() === sku && !/^Full manual text/.test(c.section || "")) take(c);
+      }
     };
     for (const sku of curRefs) forceSku(sku);
     for (const sku of ctxRefs) forceSku(sku);
 
-    // Always include the catalog overview, then the relevant manual details.
+    // The catalog overview lives in the cached system prompt now; only the
+    // per-question manual details are injected here.
     const parts = [];
-    if (catalogSummary) parts.push(`Catalog overview (all NextLED products):\n${catalogSummary}`);
     if (selected.length) {
       parts.push(`Relevant manual details:\n${selected.map((c) => c.text).join("\n\n---\n\n")}`);
     }

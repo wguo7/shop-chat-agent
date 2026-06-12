@@ -1,0 +1,275 @@
+{
+  "createdAt": "2026-06-12T14:16:53.307Z",
+  "endpoints": {
+    "https://nextool.myshopify.com/api/mcp": [
+      {
+        "name": "search_catalog",
+        "description": "Search for products from the online store, hosted on Shopify.\n\nThis tool can be used to search for products using natural language queries, specific filter criteria, or both.\nAt least one of query or filters must be provided.\n\nResults are paginated, with initial results limited to improve experience.\nUse the pagination.cursor from the response to fetch additional pages when users request more results.\n\nResponse conforms to the UCP catalog search capability (dev.ucp.shopping.catalog.search).\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "meta": {
+              "type": "object",
+              "description": "MCP transport metadata for UCP agent discovery.",
+              "properties": {
+                "ucp-agent": {
+                  "type": "object",
+                  "properties": {
+                    "profile": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Agent profile URI for UCP discovery."
+                    }
+                  }
+                }
+              }
+            },
+            "catalog": {
+              "type": "object",
+              "description": "Catalog search parameters.",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Free-text search query."
+                },
+                "context": {
+                  "type": "object",
+                  "description": "Provisional buyer signals for relevance and localization.",
+                  "properties": {
+                    "address_country": {
+                      "type": "string",
+                      "description": "ISO 3166-1 alpha-2 country code (e.g., 'US', 'CA', 'GB')."
+                    },
+                    "address_region": {
+                      "type": "string",
+                      "description": "First-level administrative division (e.g., 'CA' for California)."
+                    },
+                    "postal_code": {
+                      "type": "string",
+                      "description": "Postal or ZIP code."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "IETF BCP 47 language tag (e.g., 'en', 'fr', 'de')."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code (e.g., 'USD', 'CAD')."
+                    },
+                    "intent": {
+                      "type": "string",
+                      "description": "Background context describing the buyer's intent."
+                    }
+                  }
+                },
+                "signals": {
+                  "type": "object",
+                  "description": "Environment data provided by the platform for authorization and abuse prevention.",
+                  "properties": {
+                    "dev.ucp.buyer_ip": {
+                      "type": "string",
+                      "description": "Buyer IP address (IPv4 or IPv6)."
+                    },
+                    "dev.ucp.user_agent": {
+                      "type": "string",
+                      "description": "HTTP User-Agent header value."
+                    }
+                  }
+                },
+                "filters": {
+                  "type": "object",
+                  "description": "Filter criteria to narrow search results.",
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Filter by product categories using OR logic."
+                    },
+                    "price": {
+                      "type": "object",
+                      "description": "Price range filter in ISO 4217 minor units (e.g., 5000 = $50.00).",
+                      "properties": {
+                        "min": {
+                          "type": "integer",
+                          "description": "Minimum price in minor currency units (e.g., 5000 for $50.00)."
+                        },
+                        "max": {
+                          "type": "integer",
+                          "description": "Maximum price in minor currency units (e.g., 10000 for $100.00)."
+                        }
+                      }
+                    }
+                  }
+                },
+                "pagination": {
+                  "type": "object",
+                  "description": "Pagination parameters.",
+                  "properties": {
+                    "cursor": {
+                      "type": "string",
+                      "description": "Opaque cursor from a previous response to fetch the next page."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Requested page size. Defaults to 10, maximum is 250. Implementations may clamp to a lower maximum.",
+                      "default": 10
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "search_shop_policies_and_faqs",
+        "description": "Used to get facts about the stores policies, products, or services.\nSome examples of questions you can ask are:\n  - What is your return policy?\n  - What is your shipping policy?\n  - What is your phone number?\n  - What are your hours of operation?\"\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "A natural language query."
+            },
+            "context": {
+              "type": "string",
+              "description": "Additional information about the request such as user demographics, mood, location, or other relevant details that could help in tailoring the response appropriately."
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "get_product_details",
+        "description": "Look up a product by ID. Pass the 'options' parameter to select a specific variant for the product card. Without options, the first available variant is returned.",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "product_id": {
+              "type": "string",
+              "description": "The product ID, e.g. gid://shopify/Product/123"
+            },
+            "options": {
+              "type": "object",
+              "description": "Variant options to select a specific variant, e.g. {\"Size\": \"10\", \"Color\": \"Black\"}. Without options, the first available variant is returned. Option matching is case-insensitive and partial options are accepted."
+            },
+            "country": {
+              "type": "string",
+              "description": "ISO 3166-1 alpha-2 country code for which to return localized results (e.g., 'US', 'CA', 'GB')."
+            },
+            "language": {
+              "type": "string",
+              "description": "ISO 639-1 language code for which to return localized results (e.g., 'EN', 'FR', 'DE')."
+            }
+          },
+          "required": [
+            "product_id"
+          ]
+        }
+      }
+    ],
+    "https://nextool.account.myshopify.com/customer/api/mcp": [
+      {
+        "name": "get_most_recent_order_status",
+        "description": "Gets the status of the customer's most recent order.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "get_order_status",
+        "description": "Fetches a specific order by order number for a logged-in customer and returns status details about the order.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "order_number": {
+              "type": "string",
+              "description": "Number of the order to look up"
+            }
+          },
+          "required": [
+            "order_number"
+          ]
+        }
+      },
+      {
+        "name": "get_store_credit_balances",
+        "description": "Fetches the customer's store credit balances if they have any.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "request_return",
+        "description": "Allows a customer to request a return for an order.\nEither an order_id or an order_number is required.\n\nUse human-readable names for the return reasons (e.g. \"size too large\" instead of \"SIZE_TOO_LARGE\")\n",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "string",
+              "description": "ID of the order to return, e.g. \"gid://Shopify/Order/1234567890\""
+            },
+            "order_number": {
+              "type": "string",
+              "description": "Buyer-facing number of the order to return (alternative to order_id), e.g. \"#MX1001\""
+            },
+            "line_items": {
+              "type": "array",
+              "description": "List of items to return",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "line_item_id": {
+                    "type": "string",
+                    "description": "ID of the line item to return"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "description": "Quantity to return"
+                  },
+                  "return_reason": {
+                    "type": "string",
+                    "description": "Reason for return",
+                    "enum": [
+                      "SIZE_TOO_SMALL",
+                      "SIZE_TOO_LARGE",
+                      "UNWANTED",
+                      "NOT_AS_DESCRIBED",
+                      "WRONG_ITEM",
+                      "DEFECTIVE",
+                      "STYLE",
+                      "COLOR",
+                      "OTHER",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "customer_note": {
+                    "type": "string",
+                    "description": "Additional notes about the return"
+                  }
+                },
+                "required": [
+                  "line_item_id",
+                  "quantity",
+                  "return_reason"
+                ]
+              }
+            }
+          },
+          "required": [
+            "line_items"
+          ]
+        }
+      }
+    ]
+  }
+}

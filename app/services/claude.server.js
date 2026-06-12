@@ -5,6 +5,30 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import AppConfig from "./config.server";
 import systemPrompts from "../prompts/prompts.json";
+import { getCatalogSummary } from "./retrieval.server";
+
+/**
+ * Return a copy of the messages with a prompt-cache breakpoint on the last
+ * content block of the message at `index`. Non-destructive: the in-memory
+ * conversation history is re-sent on each agentic-loop iteration, so mutating
+ * it would accumulate breakpoints past Anthropic's limit of 4.
+ */
+function addCacheBreakpoint(messages, index) {
+  const msg = messages[index];
+  if (!msg) return messages;
+  let content = msg.content;
+  if (typeof content === "string") {
+    content = [{ type: "text", text: content, cache_control: { type: "ephemeral" } }];
+  } else if (Array.isArray(content) && content.length) {
+    content = content.slice();
+    content[content.length - 1] = { ...content[content.length - 1], cache_control: { type: "ephemeral" } };
+  } else {
+    return messages;
+  }
+  const out = messages.slice();
+  out[index] = { ...msg, content };
+  return out;
+}
 
 /**
  * Creates a Claude service instance
@@ -35,6 +59,25 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
     // Get system prompt from configuration or use default
     const systemInstruction = getSystemPrompt(promptType);
 
+    // The catalog overview is stable per deployment, so it lives INSIDE the
+    // cached system block (free after the first request) instead of being
+    // re-sent as uncached per-request context on every message.
+    const catalogSummary = getCatalogSummary();
+    const systemText = catalogSummary
+      ? `${systemInstruction}\n\nCatalog overview (all NextLED products):\n${catalogSummary}`
+      : systemInstruction;
+
+    // Cache breakpoints (max 4): one on the system block (caches tools+system),
+    // one on the second-to-last message (caches the clean conversation history
+    // across turns — the last user message carries per-question manual context
+    // that varies, so history must be cached BEFORE it), and one on the last
+    // message (caches the full current prefix, which makes the second Claude
+    // round after a tool call hit cache for everything except the tool result).
+    let cachedMessages = addCacheBreakpoint(messages, messages.length - 1);
+    if (messages.length >= 2) {
+      cachedMessages = addCacheBreakpoint(cachedMessages, messages.length - 2);
+    }
+
     // Create stream
     const stream = await anthropic.messages.stream({
       model: AppConfig.api.defaultModel,
@@ -42,15 +85,13 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
       system: [
         {
           type: "text",
-          text: systemInstruction,
-          // Cache the stable system prompt. Prefix render order is tools -> system -> messages,
-          // so this caches tools + system while per-message context and the user turn vary.
-          // Dormant until the prefix exceeds Haiku 4.5's 4096-token cache minimum, which happens
-          // on its own once retrieval injects manual chunks. No padding is added to force it.
+          text: systemText,
+          // Prefix render order is tools -> system -> messages, so this caches
+          // tools + system + catalog while the user turn varies.
           cache_control: { type: "ephemeral" }
         }
       ],
-      messages,
+      messages: cachedMessages,
       tools: tools && tools.length > 0 ? tools : undefined
     });
 

@@ -93,6 +93,7 @@ async function handleChatRequest(request) {
       ? body.conversation_id
       : null;
     const conversationId = clientId || crypto.randomUUID();
+    const isNewConversation = !clientId;
     const promptType = body.prompt_type || AppConfig.api.defaultPromptType;
 
     // Create a stream for the response
@@ -101,6 +102,7 @@ async function handleChatRequest(request) {
         request,
         userMessage,
         conversationId,
+        isNewConversation,
         promptType,
         stream
       });
@@ -131,6 +133,7 @@ async function handleChatSession({
   request,
   userMessage,
   conversationId,
+  isNewConversation,
   promptType,
   stream
 }) {
@@ -184,14 +187,15 @@ async function handleChatSession({
       console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
     });
 
-    // For price/availability questions, prefetch the live price via a direct
-    // storefront search (no connect wait). Only search when we know WHICH
-    // product: a generic query like "what is the price" returns an arbitrary
-    // catalog item, which then gets confidently relayed as the wrong answer.
-    // If the message names a product, start now (hides under the DB + retrieval
-    // latency below); for follow-ups, resolve the product from recent
-    // conversation once history is loaded (see below).
-    const priceIntent = /\b(price|prices|cost|costs|how much|pricing|msrp|\$)\b/i.test(userMessage);
+    // For price/stock questions, prefetch live catalog data via a direct
+    // storefront search (no connect wait). Answering from injected data instead
+    // of a tool round-trip saves a full extra Claude round (~2s). Only search
+    // when we know WHICH product: a generic query like "what is the price"
+    // returns an arbitrary catalog item, which then gets confidently relayed as
+    // the wrong answer. If the message names a product, start now (hides under
+    // the DB + retrieval latency below); for follow-ups, resolve the product
+    // from recent conversation once history is loaded (see below).
+    const priceIntent = /\b(price|prices|cost|costs|how much|pricing|msrp|\$|stock|in stock|availability|available|buy|purchase)\b/i.test(userMessage);
     const startPriceLookup = (term) =>
       fetchLivePrice(shopDomain, term).catch((error) => {
         console.warn("Price prefetch failed:", error.message);
@@ -216,7 +220,10 @@ async function handleChatSession({
     // turn forever), then queue the current user message for persistence.
     // The save chain keeps insert order correct, and appending in memory avoids
     // a serialized save + full re-read of the conversation on the hot path.
-    const dbMessages = await getConversationHistory(conversationId, AppConfig.api.historyLimit);
+    // Brand-new conversations (no client-supplied ID) skip the DB read entirely.
+    const dbMessages = isNewConversation
+      ? []
+      : await getConversationHistory(conversationId, AppConfig.api.historyLimit);
     persistMessage('user', userMessage);
 
     // Format messages for Claude API
@@ -302,7 +309,7 @@ async function handleChatSession({
       const last = conversationHistory.length - 1;
       conversationHistory[last] = {
         ...conversationHistory[last],
-        content: `[Live Shopify pricing — best catalog match for this conversation. Only state this price if it is the product the customer is asking about; otherwise use search_catalog.]\n${priceLine}\n\n${conversationHistory[last].content}`,
+        content: `[Live Shopify catalog data (price and stock) — best match for this conversation. Only use it if it is the product the customer is asking about; otherwise use search_catalog.]\n${priceLine}\n\n${conversationHistory[last].content}`,
       };
     }
 
@@ -557,15 +564,21 @@ function extractPrice(res, sku) {
     const p = pickPricedProduct(products, sku);
     const min = p?.price_range?.min;
     if (min == null) return null;
+    // Variant availability rides along so stock questions are answered from
+    // this injected line instead of a tool round-trip.
+    const avail = p?.variants?.[0]?.availability;
+    const stock = typeof avail?.available === "boolean"
+      ? (avail.available ? " (in stock)" : " (out of stock)")
+      : "";
     // Shape varies by store/API version: { amount, currency } in minor units,
     // or a plain decimal string/number in major units.
     if (typeof min === "object") {
       if (min.amount == null) return null;
-      return `${p.title}: $${(Number(min.amount) / 100).toFixed(2)} ${min.currency || "USD"}`;
+      return `${p.title}: $${(Number(min.amount) / 100).toFixed(2)} ${min.currency || "USD"}${stock}`;
     }
     const amount = Number(min);
     if (!Number.isFinite(amount)) return null;
-    return `${p.title}: $${amount.toFixed(2)} ${p.price_range.currency || "USD"}`;
+    return `${p.title}: $${amount.toFixed(2)} ${p.price_range.currency || "USD"}${stock}`;
   } catch {
     return null;
   }

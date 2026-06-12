@@ -29,7 +29,7 @@ export const AppConfig = {
     minScore: 0.40,
     // Hard cap on injected chunks (forced SKU chunks + semantic top-K combined).
     // Kept modest to limit per-request input tokens (faster, more consistent first token).
-    maxChunks: 10,
+    maxChunks: 8,
   },
 
   // Error Message Templates
@@ -41,6 +41,18 @@ export const AppConfig = {
     rateLimitExceeded: "Rate limit exceeded",
     rateLimitDetails: "Please try again later",
     genericError: "Failed to get response from Claude"
+  },
+
+  // Admin self-serve configuration (Knowledge + Settings pages).
+  // IDs are not secrets; the tokens they pair with live in env vars
+  // (GITHUB_TOKEN, VERCEL_TOKEN).
+  admin: {
+    githubRepo: "wguo7/shop-chat-agent",
+    githubBranch: "deploy/vercel-postgres-voyage",
+    vercelProjectId: "prj_F15fMCSVhFynYPHmgwPRgaLPNEDz",
+    vercelTeamId: "team_RyfAcoo8iP0kD6ggjQaYQTYU",
+    // Only these env vars can be changed from the admin Settings page.
+    editableEnvKeys: ["CLAUDE_API_KEY", "VOYAGE_API_KEY", "ALLOWED_ORIGINS"],
   },
 
   // Tool Configuration
