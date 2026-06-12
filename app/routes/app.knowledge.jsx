@@ -1,18 +1,18 @@
 /**
- * Admin: Knowledge base manager — upload and remove product manuals without
- * touching GitHub. Files are committed to the repo via the GitHub API, which
- * triggers the rebuild-index workflow (re-embed + deploy, ~3-5 minutes).
- * Behind Shopify admin auth. Needs GITHUB_TOKEN in env (fine-grained PAT with
- * Contents read/write on the repo).
+ * Admin: Knowledge base manager — upload, edit, and remove the bot's product
+ * manuals and store-wide answers without touching GitHub. Files are committed
+ * to the repo via the GitHub API, which triggers the rebuild-index workflow
+ * (re-embed + deploy, ~5 minutes). Behind Shopify admin auth. Needs
+ * GITHUB_TOKEN in env (fine-grained PAT with Contents read/write on the repo).
  */
 import { useState } from "react";
 import { useLoaderData, useActionData, useNavigation, Form, Link } from "react-router";
 import { authenticate } from "../shopify.server";
 import AppConfig from "../services/config.server";
 
-// Structured-manual skeleton the "Load template" button drops into the text
-// box. Sections become individually searchable chunks; the Common questions
-// entries are the highest-value part (each Q&A is its own chunk).
+// Structured-manual skeleton the "Template" button drops into the text box.
+// Sections become individually searchable chunks; the Common questions entries
+// are the highest-value part (each Q&A is its own chunk).
 const STRUCTURED_TEMPLATE = `## What it is
 One short paragraph: what the product is, what jobs it is for, and what makes it different.
 
@@ -116,7 +116,7 @@ export const action = async ({ request }) => {
       const content = String(form.get("content") || "");
       if (!isSafeName(name)) return { ok: false, message: "Invalid file." };
       if (!content.startsWith("---") || content.trim().length < 100) {
-        return { ok: false, message: "Not saved: the file must keep its header (the --- block at the top) and its content. Cancel and re-open it to start over." };
+        return { ok: false, message: "Not saved: the file must keep its --- header and its content. Cancel and re-open to start over." };
       }
       const res = await fetch(ghUrl(name).split("?")[0], {
         method: "PUT",
@@ -129,7 +129,7 @@ export const action = async ({ request }) => {
         }),
       });
       if (!res.ok) return { ok: false, message: `Save failed: ${res.status} ${await res.text()}` };
-      return { ok: true, message: `${name} saved. The bot updates automatically in ~5 minutes.` };
+      return { ok: true, message: `${name} saved — live in ~5 minutes.` };
     }
 
     if (intent === "delete") {
@@ -148,7 +148,7 @@ export const action = async ({ request }) => {
         }),
       });
       if (!res.ok) return { ok: false, message: `Delete failed: ${res.status} ${await res.text()}` };
-      return { ok: true, message: `${name} removed. The bot updates automatically in ~5 minutes.` };
+      return { ok: true, message: `${name} removed — live in ~5 minutes.` };
     }
 
     if (intent === "upload") {
@@ -161,7 +161,7 @@ export const action = async ({ request }) => {
       if (!content) return { ok: false, message: "Manual text is required." };
 
       // If they pasted a complete knowledge file (starts with frontmatter), take
-      // it as-is; otherwise compose a minimal valid file around the manual text.
+      // it as-is; otherwise compose a valid file around the pasted text.
       let fileBody;
       if (content.startsWith("---")) {
         fileBody = content;
@@ -170,9 +170,8 @@ export const action = async ({ request }) => {
         const keywordLines = keywords
           ? keywords.split(",").map((k) => `  - ${k.trim()}`).filter((k) => k.trim() !== "-").join("\n")
           : `  - ${sku}`;
-        // If the pasted text already has "## Section" headings (e.g. from the
-        // structured template), keep them as the file's sections; otherwise
-        // wrap the whole paste as one Manual section.
+        // Pasted text with its own "## Section" headings (e.g. the template)
+        // keeps them; plain text becomes one Manual section.
         const body = /^##\s/m.test(content) ? content : `## Manual\n${content}`;
         fileBody = [
           "---",
@@ -204,7 +203,7 @@ export const action = async ({ request }) => {
         }),
       });
       if (!res.ok) return { ok: false, message: `Upload failed: ${res.status} ${await res.text()}` };
-      return { ok: true, message: `${name} ${sha ? "updated" : "added"}. The bot updates automatically in ~5 minutes (Actions tab on GitHub shows progress).` };
+      return { ok: true, message: `${name} ${sha ? "updated" : "added"} — live in ~5 minutes (Actions tab on GitHub shows progress).` };
     }
 
     return { ok: false, message: "Unknown action." };
@@ -214,9 +213,10 @@ export const action = async ({ request }) => {
   }
 };
 
-const cellStyle = { padding: "8px 12px", borderBottom: "1px solid #e3e3e3", textAlign: "left" };
-const inputStyle = { padding: "8px", border: "1px solid #8a8a8a", borderRadius: "6px", fontSize: "13px", width: "100%", boxSizing: "border-box" };
-const buttonStyle = { padding: "8px 16px", borderRadius: "8px", border: "1px solid #8a8a8a", background: "#ffffff", cursor: "pointer", fontSize: "13px" };
+const cellStyle = { padding: "5px 10px", borderBottom: "1px solid #ececec", textAlign: "left" };
+const inputStyle = { padding: "7px 9px", border: "1px solid #8a8a8a", borderRadius: "6px", fontSize: "13px", width: "100%", boxSizing: "border-box" };
+const buttonStyle = { padding: "7px 14px", borderRadius: "7px", border: "1px solid #8a8a8a", background: "#ffffff", cursor: "pointer", fontSize: "13px", whiteSpace: "nowrap" };
+const labelStyle = { fontSize: "12px", fontWeight: 600, color: "#444" };
 
 export default function Knowledge() {
   const { configured, error, files, editing } = useLoaderData();
@@ -269,26 +269,14 @@ export default function Knowledge() {
             <input type="hidden" name="intent" value="save-file" />
             <input type="hidden" name="name" value={editing.name} />
             <input type="hidden" name="sha" value={editing.sha} />
-            <div style={{ display: "grid", gap: "10px" }}>
+            <div style={{ display: "grid", gap: "8px" }}>
               <s-text tone="subdued">
-                The block between the two --- lines at the top controls product matching
-                (sku, product_name, keywords) — edit values, but keep the structure.
-                Everything below it is what the bot reads when answering. Each
-                "## Section" becomes its own searchable piece; the entries under
-                "## Common questions" (bold question, then answer) are the most
-                effective way to add answers, written the way customers actually ask.
+                Keep the --- header (controls matching). Each ## section is searched
+                separately; Common questions entries answer best.
               </s-text>
-              <textarea
-                name="content"
-                defaultValue={editing.content}
-                rows={26}
-                style={{ ...inputStyle, fontFamily: "monospace" }}
-                required
-              />
+              <textarea name="content" defaultValue={editing.content} rows={24} style={{ ...inputStyle, fontFamily: "monospace" }} required />
               <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                <button type="submit" disabled={busy} style={buttonStyle}>
-                  {busy ? "Saving..." : "Save changes"}
-                </button>
+                <button type="submit" disabled={busy} style={buttonStyle}>{busy ? "Saving..." : "Save changes"}</button>
                 <Link to="/app/knowledge">Cancel</Link>
               </div>
             </div>
@@ -299,111 +287,68 @@ export default function Knowledge() {
       <s-section heading="Add or update a manual">
         <Form method="post">
           <input type="hidden" name="intent" value="upload" />
-          <div style={{ display: "grid", gap: "16px", maxWidth: "640px" }}>
-
-            <div style={{ display: "grid", gap: "4px" }}>
-              <s-text fontWeight="bold">Step 1 — Model number (SKU)</s-text>
-              <s-text tone="subdued">
-                Exactly as printed on the product and manual, e.g. NT-8810.
-                Using a SKU that already exists below REPLACES that product's manual.
-              </s-text>
-              <input name="sku" placeholder="NT-8810" style={inputStyle} required />
+          <div style={{ display: "grid", gap: "10px", maxWidth: "640px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "10px" }}>
+              <div style={{ display: "grid", gap: "3px" }}>
+                <span style={labelStyle}>SKU</span>
+                <input name="sku" placeholder="NT-8810" style={inputStyle} required />
+              </div>
+              <div style={{ display: "grid", gap: "3px" }}>
+                <span style={labelStyle}>Product name</span>
+                <input name="product_name" placeholder="Rechargeable Magnetic Light Bar" style={inputStyle} />
+              </div>
             </div>
-
-            <div style={{ display: "grid", gap: "4px" }}>
-              <s-text fontWeight="bold">Step 2 — Product name</s-text>
-              <s-text tone="subdued">
-                The name customers see on the store, without the SKU.
-              </s-text>
-              <input name="product_name" placeholder="Rechargeable Magnetic Light Bar" style={inputStyle} />
-            </div>
-
-            <div style={{ display: "grid", gap: "4px" }}>
-              <s-text fontWeight="bold">Step 3 — Customer phrases (optional, recommended)</s-text>
-              <s-text tone="subdued">
-                What a customer might call this product instead of the SKU, separated
-                by commas. These help the bot match questions like "the magnetic bar light".
-              </s-text>
+            <div style={{ display: "grid", gap: "3px" }}>
+              <span style={labelStyle}>Customer phrases (optional)</span>
               <input name="keywords" placeholder="magnetic light bar, underhood light bar, hood light" style={inputStyle} />
             </div>
-
-            <div style={{ display: "grid", gap: "4px" }}>
-              <s-text fontWeight="bold">Step 4 — Manual text</s-text>
-              <s-text tone="subdued">
-                PDFs cannot be uploaded directly. Open the PDF manual, select all the
-                text, copy, and paste it below. The important parts are: specifications,
-                operating instructions, charging, troubleshooting, and warranty —
-                legal boilerplate can be skipped. AFTER PASTING, SKIM IT: if lines jump
-                between unrelated topics (common with two-column manuals), rearrange the
-                sections so each reads top to bottom. Alternatively, choose a .md or
-                .txt file and it will fill the box for you.
-              </s-text>
-              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                <input type="file" accept=".md,.txt" onChange={handleFile} />
-                <button type="button" onClick={loadTemplate} style={buttonStyle}>
-                  Load structured template
-                </button>
-              </div>
-              <s-text tone="subdued">
-                The template adds labeled sections (Specifications table, Common
-                questions, Warranty) that make answers noticeably more precise —
-                recommended for important products. Fill in the placeholders and
-                delete sections you don't need. Plain pasted text works fine too.
-              </s-text>
+            <div style={{ display: "grid", gap: "3px" }}>
+              <span style={labelStyle}>Manual text</span>
               <textarea
                 name="content"
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
-                placeholder={
-                  "Example of what to paste:\n\n" +
-                  "The NT-8810 is a rechargeable LED light bar with magnetic ends.\n\n" +
-                  "SPECIFICATIONS\n" +
-                  "Brightness: 1200 lumens (high), 600 lumens (low)\n" +
-                  "Battery: 3.7V 4000 mAh lithium-ion\n" +
-                  "Charging time: 4 hours via USB-C (cable included)\n" +
-                  "Runtime: 3 hrs (high), 6 hrs (low)\n\n" +
-                  "OPERATION\n" +
-                  "1. Press the power button once for high mode.\n" +
-                  "2. Press again for low mode.\n" +
-                  "3. Press a third time to turn off.\n\n" +
-                  "CHARGING\n" +
-                  "Connect the included USB-C cable to the port under the rubber cap.\n" +
-                  "The indicator is red while charging and green when full."
-                }
-                rows={16}
+                placeholder={"Paste the manual text (copy it out of the PDF — PDFs can't be uploaded directly). Specs, operation, charging, troubleshooting, warranty are the parts that matter."}
+                rows={12}
                 style={{ ...inputStyle, fontFamily: "monospace" }}
                 required
               />
             </div>
-
-            <div>
-              <button type="submit" disabled={busy} style={buttonStyle}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <button type="submit" disabled={busy} style={{ ...buttonStyle, fontWeight: 600 }}>
                 {busy ? "Saving..." : "Save manual"}
               </button>
+              <button type="button" onClick={loadTemplate} style={buttonStyle}>Template</button>
+              <input type="file" accept=".md,.txt" onChange={handleFile} style={{ fontSize: "12px" }} />
             </div>
-            <s-text tone="subdued">
-              After saving, the bot learns this automatically in about 5 minutes — then
-              test it by asking the chat on the storefront a question about this product.
-              For richer structure (spec tables, pre-written Q&A), see knowledge/STYLE.md
-              in the GitHub repo.
-            </s-text>
+            <details>
+              <summary style={{ fontSize: "12px", color: "#666", cursor: "pointer" }}>Tips</summary>
+              <div style={{ fontSize: "12px", color: "#555", lineHeight: 1.5, paddingTop: "6px" }}>
+                Re-using an existing SKU replaces that product's manual. Customer phrases are what
+                shoppers say instead of the SKU. After pasting from a two-column PDF, skim it — if
+                lines jump between topics, reorder the sections. Template inserts the recommended
+                structure (specs table, Q&amp;A) — fill placeholders, delete unused sections.
+                Choosing a .md/.txt file fills the box. Saves go live in ~5 minutes; test by asking
+                the chat on the storefront.
+              </div>
+            </details>
           </div>
         </Form>
       </s-section>
 
-      <s-section heading={`Current manuals (${files.length})`}>
+      <s-section heading={`Files (${files.length})`}>
         {error && <s-text tone="critical">{error}</s-text>}
-        <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: "640px" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: "640px", fontSize: "13px" }}>
           <tbody>
             {files.map((f) => (
               <tr key={f.name}>
                 <td style={cellStyle}><s-text>{f.name}</s-text></td>
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
+                <td style={{ ...cellStyle, whiteSpace: "nowrap", width: "1%" }}>
                   <Link to={`/app/knowledge?edit=${encodeURIComponent(f.name)}`}>Edit</Link>
                 </td>
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
+                <td style={{ ...cellStyle, whiteSpace: "nowrap", width: "1%" }}>
                   {f.protected ? (
-                    <s-text tone="subdued">core file — cannot be removed</s-text>
+                    <span style={{ fontSize: "12px", color: "#999" }}>core</span>
                   ) : (
                     <Form
                       method="post"
@@ -414,7 +359,7 @@ export default function Knowledge() {
                       <input type="hidden" name="intent" value="delete" />
                       <input type="hidden" name="name" value={f.name} />
                       <input type="hidden" name="sha" value={f.sha} />
-                      <button type="submit" disabled={busy} style={{ ...buttonStyle, color: "#b91c1c" }}>
+                      <button type="submit" disabled={busy} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: "13px", padding: 0 }}>
                         Remove
                       </button>
                     </Form>
@@ -424,32 +369,12 @@ export default function Knowledge() {
             ))}
           </tbody>
         </table>
-      </s-section>
-
-      <s-section heading="Where everything else lives">
-        <s-stack gap="base">
-          <s-paragraph>
-            <s-text fontWeight="bold">Store-wide answers</s-text>
-            <s-text>
-              {" "}— returns, shipping, contact info, coupon codes, and the redirect
-              links (accessories page, manual downloads, become-a-distributor,
-              affiliate program, warranty registration) all live in
-              company-and-policies.md — click Edit on it above. To teach the bot a
-              new store-wide answer, add an entry to its Common questions section,
-              written the way customers actually ask.
-            </s-text>
-          </s-paragraph>
-          <s-paragraph>
-            <s-text fontWeight="bold">The bot's personality and hard rules</s-text>
-            <s-text>
-              {" "}— tone, never inventing prices, no purchasing in chat, the
-              not-sure fallback, and a second copy of the five standard redirect
-              links live in app/prompts/prompts.json in the GitHub repo. If you
-              change a redirect URL in the policies file, update it there too (or
-              ask whoever manages the repo).
-            </s-text>
-          </s-paragraph>
-        </s-stack>
+        <s-paragraph>
+          <s-text tone="subdued">
+            Store-wide answers and redirect links: edit company-and-policies.md. Bot tone and hard
+            rules: app/prompts/prompts.json in the repo (redirect URLs live in both — change both).
+          </s-text>
+        </s-paragraph>
       </s-section>
     </s-page>
   );
