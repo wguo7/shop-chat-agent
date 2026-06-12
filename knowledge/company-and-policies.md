@@ -62,7 +62,19 @@ You receive a tracking number once your order ships from the warehouse. You can 
 You can chat with a service representative through the messenger icon on the website, or go to the contact us page to submit a service ticket. For emergency requests, call the toll free number at 877-886-6822. You can also reach the team by email at contact@mynextled.com.
 
 ## Accessory replacements
-Replacement diffusers, charging bases, cables, clips, hooks, and chargers are available in the Accessory section at www.mynextled.com.
+Accessories and replacement parts for every product, including diffusers, chargers, clamps, clips, hooks, remotes, charge bases, battery cartridges, lamp heads, bags, and tripods, are on the Accessories page under the Products tab at https://mynextled.com/collections/accessories.
+
+## Manual and catalog downloads
+User manuals and instructions for every product, and the full product catalog, can be downloaded at https://mynextled.com/pages/downloads.
+
+## Become a distributor
+Anyone interested in becoming a NextLED distributor can apply at https://mynextled.com/pages/become-a-distributor.
+
+## Affiliate program
+Anyone interested in joining the NextLED affiliate program can sign up at https://mynextled.goaffpro.com/.
+
+## Warranty registration
+Register a product for warranty, or start a warranty request, at https://mynextled.com/pages/warranty-registration. For help with a warranty issue you can also call 877-886-6822 or email contact@mynextled.com.
 
 ## Charging troubleshooting for NT-2143C-B and NT-5571
 This guidance applies to the NT-2143C-B motion sensing detailing headlamp and the NT-5571 drop light. If either light will not charge, use this guidance.
