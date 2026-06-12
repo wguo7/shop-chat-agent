@@ -181,32 +181,84 @@ export default function Knowledge() {
       <s-section heading="Add or update a manual">
         <Form method="post">
           <input type="hidden" name="intent" value="upload" />
-          <div style={{ display: "grid", gap: "10px", maxWidth: "640px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "10px" }}>
-              <input name="sku" placeholder="SKU (e.g. NT-1234)" style={inputStyle} required />
-              <input name="product_name" placeholder="Product name" style={inputStyle} />
+          <div style={{ display: "grid", gap: "16px", maxWidth: "640px" }}>
+
+            <div style={{ display: "grid", gap: "4px" }}>
+              <s-text fontWeight="bold">Step 1 — Model number (SKU)</s-text>
+              <s-text tone="subdued">
+                Exactly as printed on the product and manual, e.g. NT-8810.
+                Using a SKU that already exists below REPLACES that product's manual.
+              </s-text>
+              <input name="sku" placeholder="NT-8810" style={inputStyle} required />
             </div>
-            <input name="keywords" placeholder="Keywords, comma-separated (e.g. tripod light, shop light)" style={inputStyle} />
-            <div>
-              <input type="file" accept=".md,.txt" onChange={handleFile} />
+
+            <div style={{ display: "grid", gap: "4px" }}>
+              <s-text fontWeight="bold">Step 2 — Product name</s-text>
+              <s-text tone="subdued">
+                The name customers see on the store, without the SKU.
+              </s-text>
+              <input name="product_name" placeholder="Rechargeable Magnetic Light Bar" style={inputStyle} />
             </div>
-            <textarea
-              name="content"
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              placeholder="Paste the manual text here (or choose a .md/.txt file above). Uploading an existing SKU replaces its manual."
-              rows={12}
-              style={{ ...inputStyle, fontFamily: "monospace" }}
-              required
-            />
+
+            <div style={{ display: "grid", gap: "4px" }}>
+              <s-text fontWeight="bold">Step 3 — Customer phrases (optional, recommended)</s-text>
+              <s-text tone="subdued">
+                What a customer might call this product instead of the SKU, separated
+                by commas. These help the bot match questions like "the magnetic bar light".
+              </s-text>
+              <input name="keywords" placeholder="magnetic light bar, underhood light bar, hood light" style={inputStyle} />
+            </div>
+
+            <div style={{ display: "grid", gap: "4px" }}>
+              <s-text fontWeight="bold">Step 4 — Manual text</s-text>
+              <s-text tone="subdued">
+                PDFs cannot be uploaded directly. Open the PDF manual, select all the
+                text, copy, and paste it below. The important parts are: specifications,
+                operating instructions, charging, troubleshooting, and warranty —
+                legal boilerplate can be skipped. AFTER PASTING, SKIM IT: if lines jump
+                between unrelated topics (common with two-column manuals), rearrange the
+                sections so each reads top to bottom. Alternatively, choose a .md or
+                .txt file and it will fill the box for you.
+              </s-text>
+              <div>
+                <input type="file" accept=".md,.txt" onChange={handleFile} />
+              </div>
+              <textarea
+                name="content"
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder={
+                  "Example of what to paste:\n\n" +
+                  "The NT-8810 is a rechargeable LED light bar with magnetic ends.\n\n" +
+                  "SPECIFICATIONS\n" +
+                  "Brightness: 1200 lumens (high), 600 lumens (low)\n" +
+                  "Battery: 3.7V 4000 mAh lithium-ion\n" +
+                  "Charging time: 4 hours via USB-C (cable included)\n" +
+                  "Runtime: 3 hrs (high), 6 hrs (low)\n\n" +
+                  "OPERATION\n" +
+                  "1. Press the power button once for high mode.\n" +
+                  "2. Press again for low mode.\n" +
+                  "3. Press a third time to turn off.\n\n" +
+                  "CHARGING\n" +
+                  "Connect the included USB-C cable to the port under the rubber cap.\n" +
+                  "The indicator is red while charging and green when full."
+                }
+                rows={16}
+                style={{ ...inputStyle, fontFamily: "monospace" }}
+                required
+              />
+            </div>
+
             <div>
               <button type="submit" disabled={busy} style={buttonStyle}>
                 {busy ? "Saving..." : "Save manual"}
               </button>
             </div>
             <s-text tone="subdued">
-              Changes go live automatically in about 5 minutes. For richer structure
-              (specs tables, Q&A), follow knowledge/STYLE.md in the repo.
+              After saving, the bot learns this automatically in about 5 minutes — then
+              test it by asking the chat on the storefront a question about this product.
+              For richer structure (spec tables, pre-written Q&A), see knowledge/STYLE.md
+              in the GitHub repo.
             </s-text>
           </div>
         </Form>
