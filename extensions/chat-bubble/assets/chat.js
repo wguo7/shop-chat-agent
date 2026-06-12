@@ -407,6 +407,15 @@
           }
         });
 
+        // Auto-link bare https URLs the model writes without markdown syntax,
+        // so they're clickable. The guard char class skips URLs already inside
+        // an href="..." attribute from the markdown pass above; trailing
+        // punctuation stays outside the link.
+        processedText = processedText.replace(
+          /(^|[^"'>])(https:\/\/[^\s<>"']*[^\s<>"'.,;:!?)])/g,
+          '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>'
+        );
+
         // Convert text to HTML with proper list handling
         processedText = this.convertMarkdownToHtml(processedText);
 
