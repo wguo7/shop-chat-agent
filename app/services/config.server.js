@@ -52,7 +52,7 @@ export const AppConfig = {
     vercelProjectId: "prj_F15fMCSVhFynYPHmgwPRgaLPNEDz",
     vercelTeamId: "team_RyfAcoo8iP0kD6ggjQaYQTYU",
     // Only these env vars can be changed from the admin Settings page.
-    editableEnvKeys: ["CLAUDE_API_KEY", "VOYAGE_API_KEY", "ALLOWED_ORIGINS"],
+    editableEnvKeys: ["CLAUDE_API_KEY", "VOYAGE_API_KEY", "ALLOWED_ORIGINS", "GITHUB_TOKEN", "VERCEL_TOKEN"],
   },
 
   // Tool Configuration

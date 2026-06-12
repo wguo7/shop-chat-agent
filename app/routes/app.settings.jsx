@@ -26,6 +26,8 @@ const KEY_DESCRIPTIONS = {
   CLAUDE_API_KEY: "Anthropic API key the chat answers with (console.anthropic.com)",
   VOYAGE_API_KEY: "Voyage AI key for manual search embeddings (dash.voyageai.com). If you change it, also update the VOYAGE_API_KEY secret on GitHub (repo Settings > Secrets > Actions) so manual uploads keep working.",
   ALLOWED_ORIGINS: "Store domains allowed to use the chat, comma-separated (e.g. https://nextool.myshopify.com,https://mynextled.com)",
+  GITHUB_TOKEN: "GitHub token powering the Knowledge page (github.com > Settings > Developer settings > Fine-grained tokens; scope to this repo only, Contents read/write).",
+  VERCEL_TOKEN: "Vercel token powering this Settings page (vercel.com/account/tokens). If you change it, also update the VERCEL_TOKEN secret on GitHub so manual uploads keep deploying.",
 };
 
 export const loader = async ({ request }) => {
