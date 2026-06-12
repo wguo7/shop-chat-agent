@@ -12,7 +12,9 @@ A chat widget on the NextLED storefront (mynextled.com / nextool.myshopify.com) 
 
 The knowledge base is the `knowledge/` folder — one Markdown file per product.
 
-**No-code path (recommended):**
+**Easiest path — the in-admin Knowledge page:** Shopify admin → Apps → shop-chat-agent → **Knowledge**. Paste manual text (or pick a .md/.txt file), set the SKU and product name, save. Remove manuals from the same page. Changes go live automatically in ~5 minutes. (Requires the `GITHUB_TOKEN` env var in Vercel — a fine-grained GitHub PAT with Contents read/write on the repo.)
+
+**GitHub web-editor path:**
 1. On github.com, open `knowledge/` on the `deploy/vercel-postgres-voyage` branch.
 2. To update: edit the product's `.md` file in the web editor.
    To add: copy the structure of `knowledge/_TEMPLATE.md` into a new file named after the SKU (e.g. `NT-1234.md`). Follow `knowledge/STYLE.md`.
@@ -37,12 +39,15 @@ Shopify admin → **Apps → shop-chat-agent → Conversations**. List, per-chat
 
 ## Task 4: Change the chat widget (storefront UI)
 
-The widget lives in `extensions/chat-bubble/` (`assets/chat.js`, `assets/chat.css`). Changes there deploy through **Shopify**, not Vercel:
-`npm run deploy -- --allow-updates` (needs Shopify CLI login to the NextLED org). The widget config (colors, welcome message) is in the theme editor.
+Colors, position, window title, and welcome message are **theme editor settings** — Shopify admin → Online Store → Customize → the AI Chat Assistant block. One "Chat color" drives the bubble, header, customer message bubbles, links, and buttons. No deploy needed.
 
-## Task 5: Allow a new storefront domain
+Code changes to the widget live in `extensions/chat-bubble/` (`assets/chat.js`, `assets/chat.css`) and deploy through **Shopify**, not Vercel: `npm run deploy -- --allow-updates` (needs Shopify CLI login to the NextLED org).
 
-The API only accepts chat requests from allowed origins. If the store gets a new domain: Vercel dashboard → project → Settings → Environment Variables → edit `ALLOWED_ORIGINS` (comma-separated full origins, e.g. `https://nextool.myshopify.com,https://mynextled.com`) → redeploy. A wrong value here breaks the whole widget ("Sorry, I couldn't process your request").
+## Task 5: Rotate API keys or allow a new storefront domain
+
+Easiest: Shopify admin → Apps → shop-chat-agent → **Settings**. Paste the new value for `CLAUDE_API_KEY`, `VOYAGE_API_KEY`, or `ALLOWED_ORIGINS` and save — it updates Vercel and redeploys automatically (live in ~2 minutes). Values are write-only. (Requires the `VERCEL_TOKEN` env var in Vercel — create at vercel.com/account/tokens.)
+
+Manual fallback: Vercel dashboard → project → Settings → Environment Variables → edit → redeploy. `ALLOWED_ORIGINS` is comma-separated full origins (e.g. `https://nextool.myshopify.com,https://mynextled.com`); a wrong value breaks the whole widget ("Sorry, I couldn't process your request").
 
 ---
 

@@ -1,8 +1,11 @@
 {{ 'chat.css' | asset_url | stylesheet_tag }}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-<div class="shop-ai-chat-container">
-  <div class="shop-ai-chat-bubble" style="background-color: {{ block.settings.chat_bubble_color }}">
+<div
+  class="shop-ai-chat-container{% if block.settings.chat_position == 'right' %} shop-ai-position-right{% endif %}"
+  style="--shop-ai-primary: {{ block.settings.chat_bubble_color }}; --shop-ai-primary-dark: {{ block.settings.chat_bubble_color | color_darken: 12 }};"
+>
+  <div class="shop-ai-chat-bubble">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
     </svg>
@@ -10,7 +13,7 @@
 
   <div class="shop-ai-chat-window">
     <div class="shop-ai-chat-header">
-      <div>{{ 'chat.title' | t }}</div>
+      <div>{% if block.settings.chat_title != blank %}{{ block.settings.chat_title }}{% else %}{{ 'chat.title' | t }}{% endif %}</div>
       <button class="shop-ai-chat-close">✕</button>
     </div>
 
@@ -48,8 +51,25 @@
     {
       "type": "color",
       "id": "chat_bubble_color",
-      "label": "Chat Bubble Color",
+      "label": "Chat color",
+      "info": "Used everywhere: the floating bubble, chat header, your customers' message bubbles, links, and buttons.",
       "default": "#5046e4"
+    },
+    {
+      "type": "select",
+      "id": "chat_position",
+      "label": "Position on page",
+      "options": [
+        { "value": "left", "label": "Bottom left" },
+        { "value": "right", "label": "Bottom right" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "text",
+      "id": "chat_title",
+      "label": "Chat window title",
+      "info": "Leave blank to use the default."
     },
     {
       "type": "text",
