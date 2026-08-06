@@ -2,9 +2,11 @@
 # cold starts. Cold ~= 2.6s, warm ~= 1s. The history endpoint runs a cheap DB query
 # and never calls Claude, so this costs nothing on the model.
 #
-# Note: GitHub's scheduled crons are best-effort (often a few minutes late) and are
-# auto-disabled after 60 days of repo inactivity. For a hard guarantee, point an
-# uptime monitor (e.g. UptimeRobot, 5-min interval) at the same URL instead.
+# Note: GitHub's scheduled crons are best-effort (often a few minutes late). The
+# last step re-enables this workflow via the API each run, which resets GitHub's
+# 60-day inactivity auto-disable timer, so no manual commits are needed to keep it
+# alive. For a hard latency guarantee, point an uptime monitor (e.g. UptimeRobot,
+# 5-min interval) at the same URL instead.
 #
 # This ping sends no Origin header; the chat route deliberately allows
 # Origin-less requests (the allowlist only guards cross-site browser use),
@@ -19,8 +21,16 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
     steps:
       - name: Warm the function + DB connection
         run: |
-          curl -s -o /dev/null -w "warmed: %{http_code} in %{time_total}s\n" \
+          curl -s -o /dev/null --max-time 30 -w "warmed: %{http_code} in %{time_total}s\n" \
             "https://shop-chat-agent-henna.vercel.app/chat?history=true&conversation_id=keepwarm" || true
+
+      - name: Reset the 60-day auto-disable timer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-warm.yml/enable"
