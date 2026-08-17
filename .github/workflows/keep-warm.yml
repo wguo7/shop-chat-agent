@@ -3,10 +3,13 @@
 # and never calls Claude, so this costs nothing on the model.
 #
 # Note: GitHub's scheduled crons are best-effort (often a few minutes late). The
-# last step re-enables this workflow via the API each run, which resets GitHub's
-# 60-day inactivity auto-disable timer, so no manual commits are needed to keep it
-# alive. For a hard latency guarantee, point an uptime monitor (e.g. UptimeRobot,
-# 5-min interval) at the same URL instead.
+# last step re-enables this workflow via the API once a day (12:xx UTC runs),
+# which resets GitHub's 60-day inactivity auto-disable timer, so no manual
+# commits are needed to keep it alive. A failed reset is a warning, not a job
+# failure: transient GitHub API 503s were failing runs whose ping had already
+# succeeded, emailing false alarms, and GitHub emails separately if a scheduled
+# workflow ever really is disabled. For a hard latency guarantee, point an
+# uptime monitor (e.g. UptimeRobot, 5-min interval) at the same URL instead.
 #
 # This ping sends no Origin header; the chat route deliberately allows
 # Origin-less requests (the allowlist only guards cross-site browser use),
@@ -21,7 +24,7 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     permissions:
       actions: write
     steps:
@@ -33,4 +36,25 @@ jobs:
       - name: Reset the 60-day auto-disable timer
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-warm.yml/enable"
+        run: |
+          # A daily reset is plenty for a 60-day timer; skipping the other ~276
+          # runs removes that many chances for a transient API error. The whole
+          # 12:xx window (up to 12 idempotent PUTs) is deliberate slack for
+          # GitHub's multi-minute cron delays; do not narrow it to one minute.
+          if [ "$(date -u +%H)" != "12" ]; then
+            echo "not the daily reset window (12:xx UTC), skipping"
+            exit 0
+          fi
+          for i in 1 2 3; do
+            # timeout: a hung API call must not eat the job's time budget; a
+            # job timeout is a hard failure and emails a false alarm.
+            if timeout 25 gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-warm.yml/enable"; then
+              echo "auto-disable timer reset"
+              exit 0
+            fi
+            if [ "$i" -lt 3 ]; then
+              echo "enable attempt $i failed, retrying in 20s"
+              sleep 20
+            fi
+          done
+          echo "::warning::could not reset the auto-disable timer today; the 12:xx UTC runs will try again tomorrow"
