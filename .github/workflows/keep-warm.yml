@@ -1,6 +1,11 @@
-# Keeps the Vercel function (and its Neon DB connection) warm so shoppers don't hit
-# cold starts. Cold ~= 2.6s, warm ~= 1s. The history endpoint runs a cheap DB query
-# and never calls Claude, so this costs nothing on the model.
+# Keeps the Vercel function warm so shoppers don't hit cold starts. Cold ~= 2.6s,
+# warm ~= 1s. Pings /healthz, which never touches the database or Claude.
+#
+# Deliberately does NOT ping a DB-touching route: Neon's free plan scales
+# compute to zero after 5 min of inactivity, so a DB query every 5 min kept
+# the compute awake 24/7 and burned the entire 100 CU-hour monthly budget
+# (~182 CU-hours needed for always-on at 0.25 CU). Neon resumes in ~0.5s on
+# the first real query, which the chat flow hides behind the history fetch.
 #
 # Note: GitHub's scheduled crons are best-effort (often a few minutes late). The
 # last step re-enables this workflow via the API once a day (12:xx UTC runs),
@@ -11,9 +16,8 @@
 # workflow ever really is disabled. For a hard latency guarantee, point an
 # uptime monitor (e.g. UptimeRobot, 5-min interval) at the same URL instead.
 #
-# This ping sends no Origin header; the chat route deliberately allows
-# Origin-less requests (the allowlist only guards cross-site browser use),
-# so this keeps working even with ALLOWED_ORIGINS set.
+# /healthz has no origin checks and reads nothing, so this keeps working
+# regardless of ALLOWED_ORIGINS.
 name: keep-warm
 
 on:
@@ -28,10 +32,10 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Warm the function + DB connection
+      - name: Warm the function (no DB touch)
         run: |
           curl -s -o /dev/null --max-time 30 -w "warmed: %{http_code} in %{time_total}s\n" \
-            "https://shop-chat-agent-henna.vercel.app/chat?history=true&conversation_id=keepwarm" || true
+            "https://shop-chat-agent-henna.vercel.app/healthz" || true
 
       - name: Reset the 60-day auto-disable timer
         env:
