@@ -62,6 +62,15 @@ export const AppConfig = {
     editableEnvKeys: ["CLAUDE_API_KEY", "VOYAGE_API_KEY", "ALLOWED_ORIGINS"],
   },
 
+  // Shopify Storefront Catalog MCP (UCP). On 2026-08-31 Shopify removed the
+  // catalog tools from {shop}/api/mcp; search_catalog, lookup_catalog and
+  // get_product now live on {shop}/api/ucp/mcp and every call must carry an
+  // agent profile URL (meta.ucp-agent.profile). The profile is a static file in
+  // public/ served by this app's stable production alias.
+  ucp: {
+    agentProfileUrl: "https://shop-chat-agent-henna.vercel.app/ucp-agent-profile.json",
+  },
+
   // Tool Configuration
   tools: {
     // Tool names whose results render product cards. Shopify's storefront MCP has

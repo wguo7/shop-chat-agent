@@ -1,180 +1,6 @@
 {
-  "createdAt": "2026-06-12T14:16:53.307Z",
+  "createdAt": "2026-10-08T02:02:29.145Z",
   "endpoints": {
-    "https://nextool.myshopify.com/api/mcp": [
-      {
-        "name": "search_catalog",
-        "description": "Search for products from the online store, hosted on Shopify.\n\nThis tool can be used to search for products using natural language queries, specific filter criteria, or both.\nAt least one of query or filters must be provided.\n\nResults are paginated, with initial results limited to improve experience.\nUse the pagination.cursor from the response to fetch additional pages when users request more results.\n\nResponse conforms to the UCP catalog search capability (dev.ucp.shopping.catalog.search).\n",
-        "input_schema": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "type": "object",
-          "properties": {
-            "meta": {
-              "type": "object",
-              "description": "MCP transport metadata for UCP agent discovery.",
-              "properties": {
-                "ucp-agent": {
-                  "type": "object",
-                  "properties": {
-                    "profile": {
-                      "type": "string",
-                      "format": "uri",
-                      "description": "Agent profile URI for UCP discovery."
-                    }
-                  }
-                }
-              }
-            },
-            "catalog": {
-              "type": "object",
-              "description": "Catalog search parameters.",
-              "properties": {
-                "query": {
-                  "type": "string",
-                  "description": "Free-text search query."
-                },
-                "context": {
-                  "type": "object",
-                  "description": "Provisional buyer signals for relevance and localization.",
-                  "properties": {
-                    "address_country": {
-                      "type": "string",
-                      "description": "ISO 3166-1 alpha-2 country code (e.g., 'US', 'CA', 'GB')."
-                    },
-                    "address_region": {
-                      "type": "string",
-                      "description": "First-level administrative division (e.g., 'CA' for California)."
-                    },
-                    "postal_code": {
-                      "type": "string",
-                      "description": "Postal or ZIP code."
-                    },
-                    "language": {
-                      "type": "string",
-                      "description": "IETF BCP 47 language tag (e.g., 'en', 'fr', 'de')."
-                    },
-                    "currency": {
-                      "type": "string",
-                      "description": "ISO 4217 currency code (e.g., 'USD', 'CAD')."
-                    },
-                    "intent": {
-                      "type": "string",
-                      "description": "Background context describing the buyer's intent."
-                    }
-                  }
-                },
-                "signals": {
-                  "type": "object",
-                  "description": "Environment data provided by the platform for authorization and abuse prevention.",
-                  "properties": {
-                    "dev.ucp.buyer_ip": {
-                      "type": "string",
-                      "description": "Buyer IP address (IPv4 or IPv6)."
-                    },
-                    "dev.ucp.user_agent": {
-                      "type": "string",
-                      "description": "HTTP User-Agent header value."
-                    }
-                  }
-                },
-                "filters": {
-                  "type": "object",
-                  "description": "Filter criteria to narrow search results.",
-                  "properties": {
-                    "categories": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      },
-                      "description": "Filter by product categories using OR logic."
-                    },
-                    "price": {
-                      "type": "object",
-                      "description": "Price range filter in ISO 4217 minor units (e.g., 5000 = $50.00).",
-                      "properties": {
-                        "min": {
-                          "type": "integer",
-                          "description": "Minimum price in minor currency units (e.g., 5000 for $50.00)."
-                        },
-                        "max": {
-                          "type": "integer",
-                          "description": "Maximum price in minor currency units (e.g., 10000 for $100.00)."
-                        }
-                      }
-                    }
-                  }
-                },
-                "pagination": {
-                  "type": "object",
-                  "description": "Pagination parameters.",
-                  "properties": {
-                    "cursor": {
-                      "type": "string",
-                      "description": "Opaque cursor from a previous response to fetch the next page."
-                    },
-                    "limit": {
-                      "type": "integer",
-                      "description": "Requested page size. Defaults to 10, maximum is 250. Implementations may clamp to a lower maximum.",
-                      "default": 10
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        "name": "search_shop_policies_and_faqs",
-        "description": "Used to get facts about the stores policies, products, or services.\nSome examples of questions you can ask are:\n  - What is your return policy?\n  - What is your shipping policy?\n  - What is your phone number?\n  - What are your hours of operation?\"\n",
-        "input_schema": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string",
-              "description": "A natural language query."
-            },
-            "context": {
-              "type": "string",
-              "description": "Additional information about the request such as user demographics, mood, location, or other relevant details that could help in tailoring the response appropriately."
-            }
-          },
-          "required": [
-            "query"
-          ]
-        }
-      },
-      {
-        "name": "get_product_details",
-        "description": "Look up a product by ID. Pass the 'options' parameter to select a specific variant for the product card. Without options, the first available variant is returned.",
-        "input_schema": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "type": "object",
-          "properties": {
-            "product_id": {
-              "type": "string",
-              "description": "The product ID, e.g. gid://shopify/Product/123"
-            },
-            "options": {
-              "type": "object",
-              "description": "Variant options to select a specific variant, e.g. {\"Size\": \"10\", \"Color\": \"Black\"}. Without options, the first available variant is returned. Option matching is case-insensitive and partial options are accepted."
-            },
-            "country": {
-              "type": "string",
-              "description": "ISO 3166-1 alpha-2 country code for which to return localized results (e.g., 'US', 'CA', 'GB')."
-            },
-            "language": {
-              "type": "string",
-              "description": "ISO 639-1 language code for which to return localized results (e.g., 'EN', 'FR', 'DE')."
-            }
-          },
-          "required": [
-            "product_id"
-          ]
-        }
-      }
-    ],
     "https://nextool.account.myshopify.com/customer/api/mcp": [
       {
         "name": "get_most_recent_order_status",
@@ -267,6 +93,403 @@
           },
           "required": [
             "line_items"
+          ]
+        }
+      }
+    ],
+    "https://nextool.myshopify.com/api/ucp/mcp": [
+      {
+        "name": "search_catalog",
+        "description": "Search for products from the online store, hosted on Shopify.\n\nThis tool can be used to search for products using natural language queries, specific filter criteria, or both.\nAt least one of query or filters must be provided.\n\nResults are paginated, with initial results limited to improve experience.\nUse the pagination.cursor from the response to fetch additional pages when users request more results.\n\nResponse conforms to the UCP catalog search capability (dev.ucp.shopping.catalog.search).\n\nPrices in the response are integers in the currency's ISO 4217 minor units, paired with\na currency code: {\"amount\": 600, \"currency\": \"USD\"} is $6.00 and {\"amount\": 2500,\n\"currency\": \"USD\"} is $25.00. Convert to major units before quoting a price to a buyer\n(divide by 100 for two-decimal currencies such as USD and EUR; zero-decimal currencies\nsuch as JPY are already whole units).\n\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "catalog": {
+              "type": "object",
+              "description": "Catalog search parameters.",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Search query string."
+                },
+                "context": {
+                  "type": "object",
+                  "description": "Buyer signals for localization and personalization.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "address_country": {
+                      "type": "string",
+                      "description": "Country code in ISO 3166-1 alpha-2 format."
+                    },
+                    "address_region": {
+                      "type": "string",
+                      "description": "Region or state."
+                    },
+                    "postal_code": {
+                      "type": "string",
+                      "description": "Postal code."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "Language tag in IETF BCP 47 format."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code in ISO 4217 format."
+                    },
+                    "intent": {
+                      "type": "string",
+                      "description": "Buyer intent."
+                    }
+                  }
+                },
+                "signals": {
+                  "type": "object",
+                  "description": "Platform environment data.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "dev.ucp.buyer_ip": {
+                      "type": "string",
+                      "description": "Buyer IP address."
+                    },
+                    "dev.ucp.user_agent": {
+                      "type": "string",
+                      "description": "Buyer user agent."
+                    }
+                  }
+                },
+                "filters": {
+                  "type": "object",
+                  "description": "Narrowing criteria for catalog results.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "description": "Category filters combined with OR logic.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "price": {
+                      "type": "object",
+                      "description": "Price range filter.",
+                      "properties": {
+                        "min": {
+                          "type": "integer",
+                          "description": "Minimum price in minor currency units."
+                        },
+                        "max": {
+                          "type": "integer",
+                          "description": "Maximum price in minor currency units."
+                        }
+                      }
+                    },
+                    "available": {
+                      "type": "boolean",
+                      "description": "Filter by availability. Default true (only sale-ready items).",
+                      "default": true
+                    }
+                  }
+                },
+                "pagination": {
+                  "type": "object",
+                  "description": "Pagination parameters.",
+                  "properties": {
+                    "cursor": {
+                      "type": "string",
+                      "description": "Pagination cursor."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Number of results to return.",
+                      "default": 10,
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "catalog"
+          ]
+        }
+      },
+      {
+        "name": "lookup_catalog",
+        "description": "Look up multiple products or variants by identifier.\nUse this tool to resolve multiple product/variant IDs in a single request.\n\nSupports:\n- Product IDs (gid://shopify/Product/...): Returns product with match: \"featured\"\n- Variant IDs (gid://shopify/ProductVariant/...): Returns parent product with the exact variant\n\nResults are grouped by product. Each variant includes an inputs array showing\nwhich request ID resolved to it and whether the match was exact or featured.\nIn versions that require input correlations, only matched variants are returned.\n\nPrices in the response are integers in the currency's ISO 4217 minor units, paired with\na currency code: {\"amount\": 600, \"currency\": \"USD\"} is $6.00 and {\"amount\": 2500,\n\"currency\": \"USD\"} is $25.00. Convert to major units before quoting a price to a buyer\n(divide by 100 for two-decimal currencies such as USD and EUR; zero-decimal currencies\nsuch as JPY are already whole units).\n\n\nMaximum 10 IDs per request.\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "catalog": {
+              "type": "object",
+              "description": "Catalog lookup parameters.",
+              "required": [
+                "ids"
+              ],
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "description": "Product IDs to look up.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "maxItems": 10
+                },
+                "context": {
+                  "type": "object",
+                  "description": "Buyer signals for localization and personalization.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "address_country": {
+                      "type": "string",
+                      "description": "Country code in ISO 3166-1 alpha-2 format."
+                    },
+                    "address_region": {
+                      "type": "string",
+                      "description": "Region or state."
+                    },
+                    "postal_code": {
+                      "type": "string",
+                      "description": "Postal code."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "Language tag in IETF BCP 47 format."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code in ISO 4217 format."
+                    },
+                    "intent": {
+                      "type": "string",
+                      "description": "Buyer intent."
+                    }
+                  }
+                },
+                "signals": {
+                  "type": "object",
+                  "description": "Platform environment data.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "dev.ucp.buyer_ip": {
+                      "type": "string",
+                      "description": "Buyer IP address."
+                    },
+                    "dev.ucp.user_agent": {
+                      "type": "string",
+                      "description": "Buyer user agent."
+                    }
+                  }
+                },
+                "filters": {
+                  "type": "object",
+                  "description": "Narrowing criteria for catalog results.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "description": "Category filters combined with OR logic.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "price": {
+                      "type": "object",
+                      "description": "Price range filter.",
+                      "properties": {
+                        "min": {
+                          "type": "integer",
+                          "description": "Minimum price in minor currency units."
+                        },
+                        "max": {
+                          "type": "integer",
+                          "description": "Maximum price in minor currency units."
+                        }
+                      }
+                    },
+                    "available": {
+                      "type": "boolean",
+                      "description": "Filter by availability. Default true (only sale-ready items).",
+                      "default": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "catalog"
+          ]
+        }
+      },
+      {
+        "name": "get_product",
+        "description": "Retrieve complete product detail by identifier. Returns a singular product\nwith a relevant set of variants, exact pricing, and real-time availability.\nSupports interactive option selection via selected and preferences parameters\nfor variant narrowing and availability signals. Use for product detail page\nrendering and purchase decisions.\n\nPrices in the response are integers in the currency's ISO 4217 minor units, paired with\na currency code: {\"amount\": 600, \"currency\": \"USD\"} is $6.00 and {\"amount\": 2500,\n\"currency\": \"USD\"} is $25.00. Convert to major units before quoting a price to a buyer\n(divide by 100 for two-decimal currencies such as USD and EUR; zero-decimal currencies\nsuch as JPY are already whole units).\n\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "catalog": {
+              "type": "object",
+              "description": "Product detail parameters.",
+              "required": [
+                "id"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Product ID."
+                },
+                "selected": {
+                  "type": "array",
+                  "description": "Selected variant options.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "preferences": {
+                  "type": "array",
+                  "description": "Buyer preferences.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "context": {
+                  "type": "object",
+                  "description": "Buyer signals for localization and personalization.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "address_country": {
+                      "type": "string",
+                      "description": "Country code in ISO 3166-1 alpha-2 format."
+                    },
+                    "address_region": {
+                      "type": "string",
+                      "description": "Region or state."
+                    },
+                    "postal_code": {
+                      "type": "string",
+                      "description": "Postal code."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "Language tag in IETF BCP 47 format."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code in ISO 4217 format."
+                    },
+                    "intent": {
+                      "type": "string",
+                      "description": "Buyer intent."
+                    }
+                  }
+                },
+                "signals": {
+                  "type": "object",
+                  "description": "Platform environment data.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "dev.ucp.buyer_ip": {
+                      "type": "string",
+                      "description": "Buyer IP address."
+                    },
+                    "dev.ucp.user_agent": {
+                      "type": "string",
+                      "description": "Buyer user agent."
+                    }
+                  }
+                },
+                "filters": {
+                  "type": "object",
+                  "description": "Narrowing criteria for catalog results.",
+                  "additionalProperties": true,
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "description": "Category filters combined with OR logic.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "price": {
+                      "type": "object",
+                      "description": "Price range filter.",
+                      "properties": {
+                        "min": {
+                          "type": "integer",
+                          "description": "Minimum price in minor currency units."
+                        },
+                        "max": {
+                          "type": "integer",
+                          "description": "Maximum price in minor currency units."
+                        }
+                      }
+                    },
+                    "available": {
+                      "type": "boolean",
+                      "description": "Filter by availability. Default true (only sale-ready items).",
+                      "default": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "catalog"
+          ]
+        }
+      }
+    ],
+    "https://nextool.myshopify.com/api/mcp": [
+      {
+        "name": "search_shop_policies_and_faqs",
+        "description": "Used to get facts about the stores policies, products, or services.\nSome examples of questions you can ask are:\n  - What is your return policy?\n  - What is your shipping policy?\n  - What is your phone number?\n  - What are your hours of operation?\"\nSet policy_types to also get the store's written policies (full text and URL).\n",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "A natural language query."
+            },
+            "context": {
+              "type": "string",
+              "description": "Additional information about the request such as user demographics, mood, location, or other relevant details that could help in tailoring the response appropriately."
+            },
+            "policy_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "refund",
+                  "shipping",
+                  "privacy",
+                  "terms_of_service",
+                  "terms_of_sale",
+                  "subscription",
+                  "legal_notice",
+                  "contact"
+                ]
+              },
+              "description": "Policy kinds to fetch, chosen from the user's question — e.g. [\"refund\"] for returns/exchanges/damaged items, [\"contact\"] for phone/hours/address. Include every kind the question touches. Omit it to get only FAQ answers."
+            }
+          },
+          "required": [
+            "query"
           ]
         }
       }

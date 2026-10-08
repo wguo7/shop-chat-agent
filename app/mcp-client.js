@@ -1,6 +1,13 @@
 import { generateAuthUrl } from "./auth.server";
 import { getCustomerToken } from "./db.server";
 import toolsSnapshot from "../data/mcp-tools.json";
+import AppConfig from "./services/config.server";
+
+// Shopify's UCP catalog endpoint requires the agent profile URL in every
+// tools/call (and accepts it on tools/list). See AppConfig.ucp.
+function ucpMeta() {
+  return { "ucp-agent": { profile: AppConfig.ucp.agentProfileUrl } };
+}
 
 // Module-level cache of formatted tool lists per MCP endpoint. Tool definitions are
 // store-wide and change rarely, so reuse them across requests (warm instances, via
@@ -45,8 +52,13 @@ class MCPClient {
     this.tools = [];
     this.customerTools = [];
     this.storefrontTools = [];
-    // TODO: Make this dynamic, for that first we need to allow access of mcp tools on password proteted demo stores.
-    this.storefrontMcpEndpoint = `${hostUrl}/api/mcp`;
+    // Catalog tools (search_catalog, lookup_catalog, get_product) moved to the
+    // UCP endpoint on 2026-08-31; the legacy endpoint still serves only
+    // search_shop_policies_and_faqs. Both are loaded; each tool remembers
+    // which endpoint it came from.
+    this.storefrontMcpEndpoint = `${hostUrl}/api/ucp/mcp`;
+    this.legacyStorefrontMcpEndpoint = `${hostUrl}/api/mcp`;
+    this.storefrontToolEndpoints = new Map();
 
     const accountHostUrl = hostUrl.replace(/(\.myshopify\.com)$/, '.account$1');
     this.customerMcpEndpoint = customerMcpEndpoint || `${accountHostUrl}/customer/api/mcp`;
@@ -127,48 +139,55 @@ class MCPClient {
    * @throws {Error} If connection to MCP server fails
    */
   async connectToStorefrontServer() {
-    try {
-      const cached = getCachedTools(this.storefrontMcpEndpoint);
-      if (cached) {
-        this.storefrontTools = cached;
-        this.tools = [...this.tools, ...cached];
-        return cached;
-      }
+    // The legacy endpoint is optional: Shopify sunset it on 2026-08-31, so a
+    // failure there must not take the catalog tools down with it.
+    const [catalogTools, legacyTools] = await Promise.all([
+      this._loadStorefrontTools(this.storefrontMcpEndpoint),
+      this._loadStorefrontTools(this.legacyStorefrontMcpEndpoint).catch((e) => {
+        console.warn("Legacy storefront MCP unavailable:", e.message);
+        return [];
+      }),
+    ]);
+    const storefrontTools = [...catalogTools, ...legacyTools];
+    this.storefrontTools = storefrontTools;
+    this.tools = [...this.tools, ...storefrontTools];
+    return storefrontTools;
+  }
 
-      const snapshot = getSnapshotTools(this.storefrontMcpEndpoint);
-      if (snapshot) {
-        this.storefrontTools = snapshot;
-        this.tools = [...this.tools, ...snapshot];
-        this._refreshToolsInBackground(this.storefrontMcpEndpoint);
-        return snapshot;
-      }
+  /**
+   * Load one storefront endpoint's tools: in-memory cache, then build-time
+   * snapshot (with background refresh), then a live tools/list.
+   *
+   * @private
+   * @param {string} endpoint - The MCP endpoint URL
+   * @returns {Promise<Array>} Formatted tools from that endpoint
+   */
+  async _loadStorefrontTools(endpoint) {
+    const register = (tools) => {
+      for (const tool of tools) this.storefrontToolEndpoints.set(tool.name, endpoint);
+      return tools;
+    };
 
-      console.log(`Connecting to MCP server at ${this.storefrontMcpEndpoint}`);
+    const cached = getCachedTools(endpoint);
+    if (cached) return register(cached);
 
-      const headers = {
-        "Content-Type": "application/json"
-      };
-
-      const response = await this._makeJsonRpcRequest(
-        this.storefrontMcpEndpoint,
-        "tools/list",
-        {},
-        headers
-      );
-
-      // Extract tools from the JSON-RPC response format
-      const toolsData = response.result && response.result.tools ? response.result.tools : [];
-      const storefrontTools = this._formatToolsData(toolsData);
-
-      setCachedTools(this.storefrontMcpEndpoint, storefrontTools);
-      this.storefrontTools = storefrontTools;
-      this.tools = [...this.tools, ...storefrontTools];
-
-      return storefrontTools;
-    } catch (e) {
-      console.error("Failed to connect to MCP server: ", e);
-      throw e;
+    const snapshot = getSnapshotTools(endpoint);
+    if (snapshot) {
+      this._refreshToolsInBackground(endpoint);
+      return register(snapshot);
     }
+
+    console.log(`Connecting to MCP server at ${endpoint}`);
+    const response = await this._makeJsonRpcRequest(
+      endpoint,
+      "tools/list",
+      endpoint === this.storefrontMcpEndpoint ? { meta: ucpMeta() } : {},
+      { "Content-Type": "application/json" }
+    );
+    const toolsData = response.result && response.result.tools ? response.result.tools : [];
+    const tools = this._formatToolsData(toolsData);
+    setCachedTools(endpoint, tools);
+    return register(tools);
   }
 
   /**
@@ -205,12 +224,20 @@ class MCPClient {
         "Content-Type": "application/json"
       };
 
+      // Route to the endpoint that advertised the tool. The UCP catalog
+      // endpoint needs the agent profile; the model never sees that field
+      // (stripped from the schema in _formatToolsData), so add it here.
+      const endpoint = this.storefrontToolEndpoints.get(toolName) || this.storefrontMcpEndpoint;
+      const args = endpoint === this.storefrontMcpEndpoint
+        ? { ...(toolArgs || {}), meta: ucpMeta() }
+        : toolArgs;
+
       const response = await this._makeJsonRpcRequest(
-        this.storefrontMcpEndpoint,
+        endpoint,
         "tools/call",
         {
           name: toolName,
-          arguments: toolArgs,
+          arguments: args,
         },
         headers
       );
@@ -362,12 +389,28 @@ class MCPClient {
    */
   _formatToolsData(toolsData) {
     return toolsData
-      .filter((tool) => !/cart|checkout/i.test(tool.name))
+      .filter((tool) => !/cart|checkout|order/i.test(tool.name))
       .map((tool) => {
+        // Drop the UCP `meta` (agent profile) field from what the model sees;
+        // callStorefrontTool injects it. Otherwise the model has to invent a
+        // profile URL for a required field.
+        const raw = tool.inputSchema || tool.input_schema || {};
+        let input_schema = raw;
+        if (raw.properties && raw.properties.meta) {
+          const properties = { ...raw.properties };
+          delete properties.meta;
+          input_schema = {
+            ...raw,
+            properties,
+            ...(Array.isArray(raw.required)
+              ? { required: raw.required.filter((r) => r !== "meta") }
+              : {}),
+          };
+        }
         return {
           name: tool.name,
           description: tool.description,
-          input_schema: tool.inputSchema || tool.input_schema,
+          input_schema,
         };
       });
   }
