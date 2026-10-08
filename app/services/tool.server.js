@@ -126,12 +126,20 @@ export function createToolService() {
   const formatProductData = (product) => {
     const price = formatProductPrice(product);
 
+    // UCP catalog shape: id is a gid, images live in media[] (product or first
+    // variant), description is { html }. Legacy fields are kept as fallbacks.
+    const media = (product.media || product.variants?.[0]?.media || []).find((m) => m?.url && (!m.type || m.type === "image"));
+    const rawDescription = product.description;
+    const description = typeof rawDescription === "string"
+      ? rawDescription
+      : String(rawDescription?.html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
     return {
-      id: product.product_id || `product-${Math.random().toString(36).substring(7)}`,
+      id: product.product_id || product.id || `product-${Math.random().toString(36).substring(7)}`,
       title: product.title || 'Product',
       price: price,
-      image_url: product.image_url || '',
-      description: product.description || '',
+      image_url: product.image_url || media?.url || '',
+      description,
       url: product.url || ''
     };
   };
