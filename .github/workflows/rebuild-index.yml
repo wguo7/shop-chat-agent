@@ -32,6 +32,8 @@ jobs:
       VERCEL_PROJECT_ID: prj_F15fMCSVhFynYPHmgwPRgaLPNEDz
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history so the pull --rebase below always finds a base
 
       - uses: actions/setup-node@v5
         with:
@@ -50,9 +52,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/manual-index.json
-          git diff --cached --quiet || git commit -m "chore(index): rebuild from knowledge change [auto]"
-          git push
+          # A prompt-only change rebuilds an identical index except for its
+          # createdAt timestamp; skip that noise commit (the deploy below
+          # still ships the prompt change).
+          if node scripts/index-unchanged.mjs; then
+            echo "Index content unchanged (timestamp only); nothing to commit."
+            git checkout -- data/manual-index.json
+          else
+            git add data/manual-index.json
+            git commit -m "chore(index): rebuild from knowledge change [auto]"
+          fi
+          # Someone may have pushed while the index was rebuilding. Replay on
+          # top of the branch tip (instead of failing a non-fast-forward push),
+          # and so the deploy below ships the tip, never an older commit.
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Deploy to Vercel production
         run: npx vercel deploy --prod --yes --token "${{ secrets.VERCEL_TOKEN }}"
