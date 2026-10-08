@@ -31,3 +31,6 @@ shopify.*.toml
 .react-router/
 .vercel
 commitmsg.tmp
+
+# local test fixtures
+/test-manual.pdf

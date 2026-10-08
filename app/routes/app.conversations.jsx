@@ -151,7 +151,7 @@ export default function Conversations() {
           </s-stack>
           <s-stack gap="tight">
             <s-heading>{stats.notSureCount}</s-heading>
-            <s-text tone="subdued">"not sure" replies (30 days) — knowledge gaps</s-text>
+            <s-text tone="subdued">{'"not sure" replies (30 days): knowledge gaps'}</s-text>
           </s-stack>
         </s-stack>
       </s-section>
