@@ -631,9 +631,16 @@ async function fetchLivePrice(shopDomain, message) {
     jsonrpc: "2.0",
     id: 1,
     method: "tools/call",
-    params: { name: "search_catalog", arguments: { catalog: { query: sku || message } } },
+    params: {
+      name: "search_catalog",
+      arguments: {
+        // UCP endpoint requires the agent profile on every call (config.ucp).
+        meta: { "ucp-agent": { profile: AppConfig.ucp.agentProfileUrl } },
+        catalog: { query: sku || message, pagination: { limit: 5 } },
+      },
+    },
   });
-  const res = await fetch(`${shopDomain}/api/mcp`, {
+  const res = await fetch(`${shopDomain}/api/ucp/mcp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
