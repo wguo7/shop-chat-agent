@@ -226,18 +226,27 @@ async function handleChatSession({
       : await getConversationHistory(conversationId, AppConfig.api.historyLimit);
     persistMessage('user', userMessage);
 
-    // Format messages for Claude API
-    const conversationHistory = dbMessages.map(dbMessage => {
+    // Format messages for Claude API. Prior-turn thinking blocks are dropped:
+    // the API never needs them for earlier turns, and Haiku 5.5 rejects a
+    // replayed thinking block when anything before it changed (the stored user
+    // turn lacks the manual context that was injected when the block was made,
+    // the history window slides, and the system prompt changes with the
+    // catalog). An assistant turn left with no content (a refusal) is skipped.
+    const conversationHistory = dbMessages.flatMap(dbMessage => {
       let content;
       try {
         content = JSON.parse(dbMessage.content);
       } catch (e) {
         content = dbMessage.content;
       }
-      return {
+      if (dbMessage.role === "assistant" && Array.isArray(content)) {
+        content = content.filter((b) => b?.type !== "thinking" && b?.type !== "redacted_thinking");
+        if (!content.length) return [];
+      }
+      return [{
         role: dbMessage.role,
         content
-      };
+      }];
     });
 
     // The capped window can open mid tool exchange; a leading tool_result whose
@@ -332,13 +341,14 @@ async function handleChatSession({
     // user payload carrying the bare question.
     let finalMessage = { stop_reason: null };
 
-    // Cap the loop: tool_use round-trips are normal, but an unexpected stop_reason
-    // (e.g. repeated max_tokens continuations) must never re-send the conversation
-    // unboundedly on a public, per-token-billed endpoint.
+    // Loop only for tool_use round-trips, capped. Any other stop_reason ends
+    // the turn: re-sending after max_tokens or refusal would put an assistant
+    // message last, which Haiku 5.5 rejects as a prefill (400), and would
+    // re-bill the conversation on a public endpoint.
     const maxIterations = 10;
     let iterations = 0;
 
-    while (finalMessage.stop_reason !== "end_turn" && iterations++ < maxIterations) {
+    do {
       finalMessage = await claudeService.streamConversation(
         {
           messages: conversationHistory,
@@ -438,6 +448,18 @@ async function handleChatSession({
           }
         }
       );
+    } while (finalMessage.stop_reason === "tool_use" && ++iterations < maxIterations);
+
+    // Haiku 5.5 can decline a request on safety grounds (stop_reason
+    // "refusal", HTTP 200) and there is no server-side fallback on Haiku.
+    // The reply is then usually a thinking block with no text, so give the
+    // customer the standard not-sure-plus-human answer instead of silence.
+    const hasText = (finalMessage.content || []).some((b) => b?.type === "text" && b.text);
+    if (finalMessage.stop_reason === "refusal" && !hasText) {
+      const fallback = "I'm not sure I can help with that one. The NextLED team can help at contact@mynextled.com or toll free at 877-886-6822.";
+      stream.sendMessage({ type: 'chunk', chunk: fallback });
+      stream.sendMessage({ type: 'message_complete' });
+      persistMessage('assistant', JSON.stringify([{ type: "text", text: fallback }]));
     }
 
     // Signal end of turn

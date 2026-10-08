@@ -82,6 +82,11 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
     const stream = await anthropic.messages.stream({
       model: AppConfig.api.defaultModel,
       max_tokens: AppConfig.api.maxTokens,
+      // Adaptive thinking is the only mode on Haiku 5.5 (budget_tokens is
+      // rejected); effort is the lever for how much it thinks. Thinking text
+      // is omitted by default, so only the block signatures come back.
+      thinking: { type: "adaptive" },
+      output_config: { effort: AppConfig.api.effort },
       system: [
         {
           type: "text",

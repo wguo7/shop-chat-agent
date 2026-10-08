@@ -18,6 +18,8 @@ module.exports = {
     browser: true,
     commonjs: true,
     es6: true,
+    // Route loaders/actions and .server files run in Node (process, Buffer).
+    node: true,
   },
   ignorePatterns: ["!**/.server", "!**/.client"],
 

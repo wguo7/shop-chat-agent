@@ -6,8 +6,15 @@
 export const AppConfig = {
   // API Configuration
   api: {
-    defaultModel: 'claude-haiku-4-5',
-    maxTokens: 768,
+    defaultModel: 'claude-haiku-5-5',
+    // Haiku 5.5 thinks by default and thinking counts toward max_tokens, so the
+    // cap must leave room for it plus the answer. Output is streamed and billed
+    // only for what is generated, so a larger cap costs nothing on short answers.
+    maxTokens: 2048,
+    // How much Haiku 5.5 thinks per turn (low | medium | high | xhigh | max).
+    // 'low' keeps time-to-first-token close to the no-thinking Haiku 4.5 setup;
+    // raise to 'medium' or 'high' if answers start ignoring prompt rules.
+    effort: 'low',
     defaultPromptType: 'standardAssistant',
     // Max prior messages sent to Claude per turn. Caps DB read size, input
     // tokens, and time-to-first-token so long conversations don't slow down
