@@ -34,3 +34,7 @@ commitmsg.tmp
 
 # local test fixtures
 /test-manual.pdf
+
+# Claude session notes (local only)
+NOW.md
+.claude/
